@@ -41,6 +41,7 @@
     }
 
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
       background: var(--bg);
@@ -48,13 +49,24 @@
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
       -webkit-font-smoothing: antialiased;
     }
+
     button, input, select { font: inherit; }
-    button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, .drop-zone:focus-visible {
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    summary:focus-visible,
+    .drop-zone:focus-visible {
       outline: 3px solid color-mix(in srgb, var(--blue) 30%, transparent);
       outline-offset: 2px;
     }
 
-    .page { width: min(960px, calc(100% - 40px)); margin: 0 auto; padding: 52px 0 68px; }
+    .page {
+      width: min(960px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 52px 0 68px;
+    }
+
     header { margin-bottom: 28px; }
     h1 { margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -.03em; }
     .subtitle { margin: 9px 0 0; color: var(--secondary); font-size: 16px; line-height: 1.45; }
@@ -68,7 +80,10 @@
       overflow: hidden;
       box-shadow: 0 14px 36px rgba(0,0,0,.07);
     }
-    .preview-pane, .settings-pane { padding: 28px; }
+
+    .preview-pane,
+    .settings-pane { padding: 28px; }
+
     .preview-pane { border-right: 1px solid var(--border); }
     .eyebrow { margin: 0 0 10px; color: var(--secondary); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
 
@@ -83,6 +98,7 @@
       overflow: hidden;
       text-align: center;
     }
+
     .drop-zone.dragging { border-color: var(--blue); }
     .drop-zone img { display: none; width: 100%; height: 100%; max-height: 430px; object-fit: contain; }
     .drop-zone.has-image img { display: block; }
@@ -96,6 +112,7 @@
     .preview-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
     .preview-heading-row .eyebrow { margin: 0; }
     .zoom-controls { display: flex; align-items: center; gap: 6px; }
+
     .zoom-button {
       width: 30px;
       height: 30px;
@@ -108,18 +125,19 @@
       font-size: 18px;
       line-height: 1;
     }
+
     .zoom-button:hover:not(:disabled) { border-color: var(--border-strong); }
     .zoom-button:disabled { opacity: .4; cursor: default; }
     .zoom-value { min-width: 48px; color: var(--secondary); font-size: 12px; text-align: center; }
+
     .output-preview-frame {
-      min-height: 300px;
+      height: 360px;
       max-height: 460px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       border: 1px solid var(--border);
       border-radius: 14px;
       overflow: auto;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
       background-color: var(--checker-b);
       background-image:
         linear-gradient(45deg, var(--checker-a) 25%, transparent 25%),
@@ -129,15 +147,26 @@
       background-size: 20px 20px;
       background-position: 0 0, 0 10px, 10px -10px, -10px 0;
     }
-    .output-preview-frame img {
+
+    .output-preview-stage {
+      width: max-content;
+      min-width: 100%;
+      height: max-content;
+      min-height: 100%;
+      padding: 18px;
+      display: grid;
+      place-items: center;
+    }
+
+    .output-preview-stage img {
       display: none;
-      flex: none;
       max-width: none;
       max-height: none;
       object-fit: contain;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
     }
+
     .output-preview-frame.has-preview img { display: block; }
     .output-preview-frame.has-preview .preview-empty { display: none; }
     .preview-empty { padding: 30px; text-align: center; color: var(--secondary); font-size: 13px; line-height: 1.45; }
@@ -148,21 +177,36 @@
     .label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
     label { font-size: 13px; font-weight: 600; }
     .hint { color: var(--secondary); font-size: 11px; }
-    input[type="number"], input[type="text"], select {
-      width: 100%; height: 40px; padding: 0 11px;
-      border: 1px solid var(--border); border-radius: 10px;
-      background: var(--surface-soft); color: var(--text);
+
+    input[type="number"],
+    input[type="text"],
+    select {
+      width: 100%;
+      height: 40px;
+      padding: 0 11px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-soft);
+      color: var(--text);
     }
+
     .size-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
     .times { color: var(--secondary); }
     .presets { display: flex; gap: 7px; margin-top: 8px; }
 
-    .secondary-button, .preset {
-      min-height: 34px; padding: 6px 11px;
-      border: 1px solid var(--border); border-radius: 9px;
-      background: var(--surface-soft); color: var(--text); cursor: pointer;
+    .secondary-button,
+    .preset {
+      min-height: 34px;
+      padding: 6px 11px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--surface-soft);
+      color: var(--text);
+      cursor: pointer;
     }
-    .secondary-button:hover, .preset:hover { border-color: var(--border-strong); }
+
+    .secondary-button:hover,
+    .preset:hover { border-color: var(--border-strong); }
 
     .folder-box {
       padding: 11px 12px;
@@ -170,6 +214,7 @@
       border-radius: 11px;
       background: var(--surface-soft);
     }
+
     .folder-path { margin-top: 8px; color: var(--secondary); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
 
     details { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 22px; }
@@ -179,10 +224,18 @@
     .check-row input { width: 16px; height: 16px; accent-color: var(--blue); }
 
     .action { border-top: 1px solid var(--border); margin-top: 23px; padding-top: 20px; }
+
     .primary {
-      width: 100%; min-height: 44px; border: 0; border-radius: 10px;
-      background: var(--blue); color: white; font-weight: 600; cursor: pointer;
+      width: 100%;
+      min-height: 44px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--blue);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
     }
+
     .primary:hover { background: var(--blue-hover); }
     .primary:disabled { opacity: .45; cursor: default; }
     .status { margin-top: 10px; min-height: 20px; color: var(--secondary); font-size: 12px; line-height: 1.45; }
@@ -195,7 +248,7 @@
       .app-card { grid-template-columns: 1fr; }
       .preview-pane { border-right: 0; border-bottom: 1px solid var(--border); }
       .drop-zone { min-height: 280px; }
-      .output-preview-frame { min-height: 260px; }
+      .output-preview-frame { height: 320px; }
     }
   </style>
 </head>
@@ -229,8 +282,10 @@
             </div>
           </div>
           <div id="outputPreviewFrame" class="output-preview-frame">
-            <img id="outputPreview" alt="Converted output preview">
-            <div class="preview-empty">Choose a source image to preview the converted result.</div>
+            <div class="output-preview-stage">
+              <img id="outputPreview" alt="Converted output preview">
+              <div class="preview-empty">Choose a source image to preview the converted result.</div>
+            </div>
           </div>
           <div id="previewState" class="preview-state"></div>
         </div>
@@ -463,6 +518,7 @@
         setStatus('Choose a PNG, JPEG, or WebP image.', 'error');
         return;
       }
+
       selectedFile = file;
       if (sourcePreviewUrl) URL.revokeObjectURL(sourcePreviewUrl);
       sourcePreviewUrl = URL.createObjectURL(file);
@@ -488,10 +544,12 @@
       event.preventDefault();
       dropZone.classList.add('dragging');
     }));
+
     ['dragleave', 'drop'].forEach(type => dropZone.addEventListener(type, event => {
       event.preventDefault();
       dropZone.classList.remove('dragging');
     }));
+
     dropZone.addEventListener('drop', event => chooseFile(event.dataTransfer.files[0]));
 
     document.querySelectorAll('.preset').forEach(button => button.addEventListener('click', () => {
@@ -505,6 +563,7 @@
       refreshSuggestedName();
       scheduleOutputPreview();
     }));
+
     [resampleInput, ditherInput, cropTransparent, hardAlpha].forEach(input => input.addEventListener('change', scheduleOutputPreview));
 
     zoomOutButton.addEventListener('click', () => stepPreviewZoom(-1));
@@ -513,14 +572,17 @@
     folderButton.addEventListener('click', async () => {
       folderButton.disabled = true;
       setStatus('Opening folder chooser…');
+
       try {
         const response = await fetch('/api/choose-folder', { method: 'POST' });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Could not choose a folder.');
+
         if (data.cancelled) {
           setStatus(selectedFile ? 'Choose an output folder.' : 'Choose an image and output folder to begin.');
           return;
         }
+
         hasOutputFolder = true;
         folderPath.textContent = data.path;
         updateConvertState();
