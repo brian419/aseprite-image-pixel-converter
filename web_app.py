@@ -112,7 +112,7 @@ def _convert_request_image() -> tuple[Image.Image, str, int, int, int | None]:
         raise ValueError("Unknown color handling mode.")
     colors = _int_form("colors", 32, 2, 256) if color_mode == "limit" else None
 
-    resample = request.form.get("resample", "lanczos")
+    resample = request.form.get("resample", "nearest")
     if resample not in {"nearest", "box", "hamming", "bicubic", "lanczos"}:
         raise ValueError("Unknown resize method.")
 
