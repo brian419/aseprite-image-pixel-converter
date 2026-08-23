@@ -12,7 +12,7 @@ from flask import Flask, jsonify, request, send_file
 from PIL import Image, UnidentifiedImageError
 from waitress import serve
 
-from aseprite_image_pixel_converter import convert_pil_image
+from aseprite_image_pixel_converter import auto_remove_background, convert_pil_image
 
 APP_HOST = "127.0.0.1"
 APP_PORT = 8765
@@ -112,7 +112,7 @@ def _convert_request_image() -> tuple[Image.Image, str, int, int, int | None]:
     colors = _int_form("colors", 32, 2, 256) if color_mode == "limit" else None
 
     resample = request.form.get("resample", "nearest")
-    if resample not in {"nearest", "box", "hamming", "bicubic", "lanczos"}:
+    if resample not in {"nearest", "detail", "box", "hamming", "bicubic", "lanczos"}:
         raise ValueError("Unknown resize method.")
 
     dither = request.form.get("dither", "none")
@@ -129,6 +129,7 @@ def _convert_request_image() -> tuple[Image.Image, str, int, int, int | None]:
         dither=dither,
         crop_transparent=False,
         hard_alpha=True,
+        remove_background=True,
     )
     return result, source_name, width, height, colors
 
@@ -160,6 +161,7 @@ def choose_folder():
 def source_preview():
     try:
         source, _source_name = _read_uploaded_rgba()
+        source = auto_remove_background(source)
         buffer = io.BytesIO()
         source.save(buffer, format="PNG", optimize=False)
         buffer.seek(0)
