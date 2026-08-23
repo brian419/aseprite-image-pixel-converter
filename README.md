@@ -2,7 +2,7 @@
 
 A local utility for converting large reference images into crisp, low-resolution PNGs for refinement in Aseprite.
 
-The converter is designed for source images that have useful visual structure but are too large or too soft to edit comfortably as pixel art. It resizes the image onto a controlled pixel grid while preserving transparency, transparent margins, and overall composition. Color reduction is optional rather than mandatory, allowing detail to be retained when the source benefits from a broader range of resized colors.
+The converter is designed for source images that have useful visual structure but are too large or too soft to edit comfortably as pixel art. It resizes the image onto a controlled pixel grid, attempts to make inferred opaque backgrounds transparent, preserves existing transparent spacing, and can optionally limit the palette.
 
 ## Overview
 
@@ -14,6 +14,8 @@ Typical workflow:
 reference image
     ↓
 drag into the local app
+    ↓
+automatically infer/remove edge-connected background when possible
     ↓
 choose canvas size and resize method
     ↓
@@ -36,6 +38,8 @@ The converter is intended as a preparation tool, not a replacement for manual pi
 
 - Local image processing; source images are not sent to an external service.
 - Drag-and-drop browser interface.
+- Automatic edge-connected background transparency for opaque source images when a background can be inferred.
+- Existing transparent backgrounds and margins are preserved rather than cropped.
 - Linked source and converted-output comparison views.
 - Matched visual scale for direct before-and-after inspection.
 - Synchronized zoom and pan between source and output views.
@@ -44,12 +48,10 @@ The converter is intended as a preparation tool, not a replacement for manual pi
 - Live converted-output preview before saving.
 - Preserve resized RGB colors by default for stronger detail retention.
 - Optional palette limiting from 2 to 256 colors.
-- Nearest, Lanczos, Bicubic, Hamming, and Box resize methods.
+- Nearest, Detail Preserve, Lanczos, Bicubic, Hamming, and Box resize methods.
 - Descriptive filenames generated from the selected conversion settings.
 - Native folder chooser for explicit output selection.
 - Configurable output width and height.
-- Transparent-background preservation.
-- Transparent margins are preserved rather than cropped.
 - Aspect-ratio preservation and automatic centering.
 - Command-line interface for advanced or scripted use.
 - Unit tests for the image converter and local web backend.
@@ -95,20 +97,27 @@ http://127.0.0.1:8765
 ## Using the App
 
 1. Drag an image into the source area, or click the source area to choose a file.
-2. Set the target canvas size.
-3. Leave **Resize method** on **Nearest — Recommended**, or compare another method in the live preview.
-4. Leave **Color handling** on **Preserve resized colors** when you want to retain the resized image's full color detail.
-5. To reduce colors deliberately, choose **Limit palette**. The visible **Palette colors** field becomes active; `32` is only a starting value and can be changed from `2` to `256`.
-6. Compare the **Source Image** and **Output Preview** at the same visual scale.
-7. Use the **−** and **+** controls to zoom both views together.
-8. Click and drag either preview to pan; the other preview follows the same position.
-9. Choose a destination folder with **Choose Folder…**.
-10. Click **Convert Image** to save the displayed result.
-11. Open the resulting PNG in Aseprite for final refinement.
+2. If the source has an opaque background, the app attempts to infer a dominant border/background color and make the connected outer background transparent.
+3. Set the target canvas size.
+4. Leave **Resize method** on **Nearest — Recommended** for normal pixel sampling, or try **Detail Preserve — complex art** for unusually dense references.
+5. Leave **Color handling** on **Preserve resized colors** when you want to retain the resized image's full color detail.
+6. To reduce colors deliberately, choose **Limit palette**. The visible **Palette colors** field becomes active; `32` is only a starting value and can be changed from `2` to `256`.
+7. Compare the **Source Image** and **Output Preview** at the same visual scale.
+8. Use the **−** and **+** controls to zoom both views together.
+9. Click and drag either preview to pan; the other preview follows the same position.
+10. Choose a destination folder with **Choose Folder…**.
+11. Click **Convert Image** to save the displayed result.
+12. Open the resulting PNG in Aseprite for final refinement.
 
 A destination folder is selected for each conversion. Previewing does not save a file and does not require an output folder.
 
-The source image's transparent margins are kept as part of the composition. The web interface does not crop them before resizing.
+### Automatic background transparency
+
+For opaque inputs, the converter estimates the dominant color along the outer border, identifies nearby colors within a conservative tolerance, and removes only matching areas that are connected to the outside edge. This helps protect dark holes, recesses, shadows, and other enclosed details inside the model.
+
+If the source already has meaningful transparency around its border, the converter trusts the existing alpha channel instead of trying to infer another background.
+
+This is intentionally conservative. Highly textured, photographic, multi-color, or object-touching backgrounds may still need manual cleanup in Aseprite.
 
 ### Generated filenames
 
@@ -116,6 +125,12 @@ The suggested filename updates automatically when the main conversion settings c
 
 ```text
 source-128x128-nearest-preserve.png
+```
+
+The dense-art mode is recorded as:
+
+```text
+source-128x128-detail-preserve.png
 ```
 
 Palette-limited files include the palette size:
@@ -134,24 +149,31 @@ Canvas size and color handling solve different problems:
 - **Preserve resized colors** keeps the RGB colors created by the resize operation instead of forcing them into a limited palette.
 - **Limit palette** intentionally merges colors. When enabled, the **Palette colors** field controls the maximum palette size; `32` is a starting value, not a required setting.
 
-For detailed references, `128 × 128` with **Preserve resized colors** and **Nearest — Recommended** is the default starting point. Increase the canvas to `160 × 160` or higher when small interior shapes still disappear. Use palette limiting only when color simplification is part of the desired look.
+For detailed references, `128 × 128` with **Preserve resized colors** and **Nearest — Recommended** remains the normal starting point. For extremely dense references with tiny engravings, nested mechanisms, many highlights, or many layered surfaces, compare **Detail Preserve — complex art** in the live preview. Increasing the canvas to `160 × 160` or higher can still be necessary when the source contains more spatial information than 128 pixels can represent.
 
 ## Resize Methods
 
 - **Nearest** — recommended default; preserves hard pixel sampling without interpolation.
+- **Detail Preserve** — new dense-reference mode; performs high-quality Lanczos reduction and then controlled local sharpening to retain more visual separation in intricate inputs.
 - **Lanczos** — detailed interpolation during strong downscaling.
 - **Bicubic** — balanced interpolation with a slightly softer result.
 - **Hamming** — useful for a somewhat sharper interpolated reduction.
 - **Box** — simple area averaging.
 
-The best method depends on the source. The linked preview makes it possible to compare them before saving.
+The existing resize methods are unchanged. **Detail Preserve** is an additional option specifically for complex source art.
 
 ## Command-Line Interface
 
-The underlying converter remains available directly. The default CLI path preserves resized colors, transparent margins, and uses Nearest resizing:
+The underlying converter remains available directly. The default CLI path preserves resized colors, preserves transparent margins, attempts automatic background transparency, and uses Nearest resizing:
 
 ```bash
 python3 aseprite_image_pixel_converter.py input.png output.png --size 128
+```
+
+Use the detail-preserving method with:
+
+```bash
+python3 aseprite_image_pixel_converter.py input.png output.png --size 128 --resample detail
 ```
 
 To deliberately limit the palette:
@@ -160,7 +182,7 @@ To deliberately limit the palette:
 python3 aseprite_image_pixel_converter.py input.png output.png --size 128 --colors 32
 ```
 
-The CLI can explicitly crop transparent margins with `--crop`, but cropping is not the default and is not exposed in the browser interface.
+The CLI can skip automatic background removal with `--keep-background` or explicitly crop transparent margins with `--crop`. Neither option is exposed in the streamlined browser interface.
 
 View all options:
 
