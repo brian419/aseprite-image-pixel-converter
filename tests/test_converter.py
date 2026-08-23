@@ -6,7 +6,11 @@ from pathlib import Path
 
 from PIL import Image
 
-from aseprite_image_pixel_converter import convert_image, convert_pil_image
+from aseprite_image_pixel_converter import (
+    auto_remove_background,
+    convert_image,
+    convert_pil_image,
+)
 
 
 class ConverterTests(unittest.TestCase):
@@ -16,7 +20,13 @@ class ConverterTests(unittest.TestCase):
             for y in range(256):
                 source.putpixel((x, y), (x, y, (x + y) % 256, 255))
 
-        result = convert_pil_image(source, width=128, height=128, resample="lanczos")
+        result = convert_pil_image(
+            source,
+            width=128,
+            height=128,
+            resample="lanczos",
+            remove_background=False,
+        )
         visible_colors = {
             (red, green, blue)
             for red, green, blue, alpha in result.getdata()
@@ -65,7 +75,13 @@ class ConverterTests(unittest.TestCase):
             output_path = temp / "wide-output.png"
 
             Image.new("RGBA", (200, 100), (255, 0, 0, 255)).save(source_path)
-            convert_image(source_path, output_path, width=80, height=80)
+            convert_image(
+                source_path,
+                output_path,
+                width=80,
+                height=80,
+                remove_background=False,
+            )
 
             result = Image.open(output_path).convert("RGBA")
             bbox = result.getchannel("A").getbbox()
@@ -89,20 +105,55 @@ class ConverterTests(unittest.TestCase):
             bbox = result.getchannel("A").getbbox()
             self.assertEqual(bbox, (32, 16, 48, 64))
 
-    def test_explicit_crop_is_still_supported_in_core(self) -> None:
-        image = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
-        for x in range(40, 60):
-            for y in range(20, 80):
-                image.putpixel((x, y), (40, 80, 120, 255))
+    def test_auto_background_removal_only_removes_edge_connected_background(self) -> None:
+        image = Image.new("RGBA", (80, 80), (12, 12, 12, 255))
+        for x in range(15, 65):
+            for y in range(10, 70):
+                image.putpixel((x, y), (170, 110, 40, 255))
+        for x in range(35, 45):
+            for y in range(35, 45):
+                image.putpixel((x, y), (12, 12, 12, 255))
 
-        result = convert_pil_image(image, width=80, height=80, crop_transparent=True)
-        self.assertEqual(result.getchannel("A").getbbox(), (26, 0, 53, 80))
+        result = auto_remove_background(image)
+        self.assertEqual(result.getpixel((0, 0))[3], 0)
+        self.assertEqual(result.getpixel((20, 20))[3], 255)
+        self.assertEqual(result.getpixel((40, 40))[3], 255)
+
+    def test_existing_transparent_border_is_left_intact(self) -> None:
+        image = Image.new("RGBA", (40, 40), (0, 0, 0, 0))
+        for x in range(10, 30):
+            for y in range(10, 30):
+                image.putpixel((x, y), (20, 20, 20, 255))
+
+        result = auto_remove_background(image)
+        self.assertEqual(result.tobytes(), image.tobytes())
+
+    def test_detail_preserve_resize_is_supported(self) -> None:
+        source = Image.new("RGBA", (512, 512), (20, 20, 20, 255))
+        for x in range(80, 432, 8):
+            for y in range(80, 432, 8):
+                source.putpixel((x, y), ((x * 3) % 256, (y * 5) % 256, 180, 255))
+
+        result = convert_pil_image(
+            source,
+            width=128,
+            height=128,
+            resample="detail",
+            remove_background=False,
+        )
+        self.assertEqual(result.size, (128, 128))
 
     def test_additional_resize_filters_are_supported(self) -> None:
         source = Image.new("RGBA", (64, 64), (120, 80, 40, 255))
         for method in ("hamming", "bicubic"):
             with self.subTest(method=method):
-                result = convert_pil_image(source, width=32, height=32, resample=method)
+                result = convert_pil_image(
+                    source,
+                    width=32,
+                    height=32,
+                    resample=method,
+                    remove_background=False,
+                )
                 self.assertEqual(result.size, (32, 32))
 
     def test_rejects_fully_transparent_image(self) -> None:
