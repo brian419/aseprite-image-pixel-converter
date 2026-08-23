@@ -48,6 +48,8 @@ def _safe_output_name(
     width: int,
     height: int,
     colors: int | None,
+    resample: str,
+    dither: str,
 ) -> str:
     requested = requested.strip()
     if requested.lower().endswith(".png"):
@@ -55,8 +57,14 @@ def _safe_output_name(
         stem = _safe_stem(name)
         return f"{stem}.png" if not stem.lower().endswith(".png") else stem
 
-    suffix = f"-{colors}c" if colors is not None else ""
-    return f"{_safe_stem(source_name)}-{width}x{height}{suffix}.png"
+    parts = [_safe_stem(source_name), f"{width}x{height}", resample]
+    if colors is None:
+        parts.append("preserve")
+    else:
+        parts.append(f"{colors}c")
+        if dither == "floyd":
+            parts.append("floyd")
+    return "-".join(parts) + ".png"
 
 
 def _choose_output_folder() -> Path | None:
@@ -203,12 +211,16 @@ def convert():
 
     try:
         result, source_name, width, height, colors = _convert_request_image()
+        resample = request.form.get("resample", "nearest")
+        dither = request.form.get("dither", "none")
         output_name = _safe_output_name(
             request.form.get("output_name", ""),
             source_name,
             width,
             height,
             colors,
+            resample,
+            dither,
         )
 
         output_directory = _selected_output_directory
