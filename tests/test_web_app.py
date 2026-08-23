@@ -49,6 +49,24 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {"ok": True})
 
+    def test_source_preview_returns_cropped_high_resolution_png(self) -> None:
+        response = self.client.post(
+            "/api/source-preview",
+            data={
+                "image": (self._image_bytes(), "artifact.png"),
+                "crop_transparent": "true",
+                "alpha_threshold": "8",
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "image/png")
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+
+        with Image.open(io.BytesIO(response.data)) as result:
+            self.assertEqual(result.size, (80, 60))
+
     def test_preview_returns_converted_png_without_output_folder(self) -> None:
         response = self.client.post(
             "/api/preview",
