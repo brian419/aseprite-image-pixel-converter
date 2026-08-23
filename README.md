@@ -1,6 +1,6 @@
 # Aseprite Image Pixel Converter
 
-A local macOS utility for converting large reference images into smaller, palette-limited PNGs for refinement in Aseprite.
+A local utility for converting large reference images into smaller, palette-limited PNGs for refinement in Aseprite.
 
 The project is designed for workflows where a source image has useful visual structure but is too large, too soft, or contains too many colors to edit comfortably as pixel art. The converter reduces the image to a controlled canvas and palette while preserving transparency and overall composition, producing a cleaner starting point for manual work in Aseprite.
 
@@ -31,7 +31,7 @@ The converter is intended as a preparation tool, not a replacement for manual pi
 - Local image processing; source images are not sent to an external service.
 - Drag-and-drop browser interface.
 - Source-image preview.
-- Native macOS folder chooser for direct output.
+- Native folder chooser for direct output.
 - Browser-download fallback when no folder is selected.
 - Configurable output width and height.
 - Configurable palette size from 2 to 256 colors.
@@ -44,9 +44,12 @@ The converter is intended as a preparation tool, not a replacement for manual pi
 - Command-line interface for advanced or scripted use.
 - Unit tests for the image converter and local web backend.
 
+## Platform Support
+
+The current launcher and native folder-selection integration are geared toward macOS. The image-conversion core is Python-based and is not inherently tied to a specific computer model.
+
 ## Requirements
 
-- macOS for the native folder-selection workflow
 - Python 3.10 or newer
 - Flask
 - Pillow
@@ -144,7 +147,7 @@ aseprite-image-pixel-converter/
 │   └── index.html                      # browser interface
 ├── tests/                              # automated tests
 ├── requirements.txt                    # Python dependencies
-└── start.command                       # macOS launcher
+└── start.command                       # local launcher
 ```
 
 ## Branch Policy
