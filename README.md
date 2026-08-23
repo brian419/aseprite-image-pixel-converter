@@ -31,8 +31,7 @@ The converter is intended as a preparation tool, not a replacement for manual pi
 - Local image processing; source images are not sent to an external service.
 - Drag-and-drop browser interface.
 - Source-image preview.
-- Native folder chooser for direct output.
-- Browser-download fallback when no folder is selected.
+- Native folder chooser for explicit output selection.
 - Configurable output width and height.
 - Configurable palette size from 2 to 256 colors.
 - Transparent-background preservation.
@@ -53,6 +52,7 @@ The current launcher and native folder-selection integration are geared toward m
 - Python 3.10 or newer
 - Flask
 - Pillow
+- Waitress
 
 Dependencies are installed automatically into a local virtual environment by the launcher on first use.
 
@@ -87,11 +87,11 @@ http://127.0.0.1:8765
 2. Set the target canvas size.
 3. Set the palette color limit.
 4. Choose a resize method.
-5. Optionally choose a destination folder with **Choose Folder…**.
+5. Choose a destination folder with **Choose Folder…**.
 6. Click **Convert Image**.
 7. Open the resulting PNG in Aseprite for final refinement.
 
-If no output folder is selected, the converted image is downloaded through the browser.
+A destination folder is selected for each conversion.
 
 ### Choosing settings
 
