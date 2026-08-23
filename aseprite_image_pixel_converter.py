@@ -6,7 +6,7 @@ from typing import Literal
 
 from PIL import Image
 
-ResampleName = Literal["nearest", "box", "lanczos"]
+ResampleName = Literal["nearest", "box", "hamming", "bicubic", "lanczos"]
 DitherName = Literal["none", "floyd"]
 
 
@@ -14,6 +14,8 @@ def _resample_filter(name: ResampleName) -> Image.Resampling:
     return {
         "nearest": Image.Resampling.NEAREST,
         "box": Image.Resampling.BOX,
+        "hamming": Image.Resampling.HAMMING,
+        "bicubic": Image.Resampling.BICUBIC,
         "lanczos": Image.Resampling.LANCZOS,
     }[name]
 
@@ -44,23 +46,27 @@ def _fit_size(source: tuple[int, int], target: tuple[int, int]) -> tuple[int, in
 def convert_pil_image(
     source: Image.Image,
     *,
-    width: int = 80,
-    height: int = 80,
-    colors: int = 16,
+    width: int = 128,
+    height: int = 128,
+    colors: int | None = None,
     alpha_threshold: int = 8,
-    resample: ResampleName = "nearest",
+    resample: ResampleName = "lanczos",
     dither: DitherName = "none",
     crop_transparent: bool = True,
     hard_alpha: bool = True,
 ) -> Image.Image:
-    """Return a small, palette-limited RGBA image suitable for Aseprite cleanup."""
+    """Return a resized RGBA image suitable for inspection and refinement in Aseprite.
+
+    By default the RGB colors produced by resizing are preserved. Pass ``colors``
+    to intentionally quantize the visible image to a palette of 2-256 colors.
+    """
     if width < 1 or height < 1:
         raise ValueError("width and height must both be at least 1.")
-    if not 2 <= colors <= 256:
-        raise ValueError("colors must be between 2 and 256.")
+    if colors is not None and not 2 <= colors <= 256:
+        raise ValueError("colors must be between 2 and 256 when palette limiting is enabled.")
     if not 0 <= alpha_threshold <= 254:
         raise ValueError("alpha_threshold must be between 0 and 254.")
-    if resample not in {"nearest", "box", "lanczos"}:
+    if resample not in {"nearest", "box", "hamming", "bicubic", "lanczos"}:
         raise ValueError("Unknown resize method.")
     if dither not in {"none", "floyd"}:
         raise ValueError("Unknown dithering mode.")
@@ -78,18 +84,21 @@ def convert_pil_image(
     else:
         alpha = resized.getchannel("A")
 
-    rgb = resized.convert("RGB")
-    quantized = rgb.quantize(
-        colors=colors,
-        method=Image.Quantize.MEDIANCUT,
-        dither=_dither_mode(dither),
-    ).convert("RGBA")
-    quantized.putalpha(alpha)
+    if colors is None:
+        converted = resized.convert("RGBA")
+    else:
+        converted = resized.convert("RGB").quantize(
+            colors=colors,
+            method=Image.Quantize.MEDIANCUT,
+            dither=_dither_mode(dither),
+        ).convert("RGBA")
+
+    converted.putalpha(alpha)
 
     canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    x = (width - quantized.width) // 2
-    y = (height - quantized.height) // 2
-    canvas.alpha_composite(quantized, (x, y))
+    x = (width - converted.width) // 2
+    y = (height - converted.height) // 2
+    canvas.alpha_composite(converted, (x, y))
     return canvas
 
 
@@ -97,11 +106,11 @@ def convert_image(
     input_path: str | Path,
     output_path: str | Path,
     *,
-    width: int = 80,
-    height: int = 80,
-    colors: int = 16,
+    width: int = 128,
+    height: int = 128,
+    colors: int | None = None,
     alpha_threshold: int = 8,
-    resample: ResampleName = "nearest",
+    resample: ResampleName = "lanczos",
     dither: DitherName = "none",
     crop_transparent: bool = True,
     hard_alpha: bool = True,
@@ -131,27 +140,32 @@ def convert_image(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Prepare large PNG/reference images as smaller palette-limited PNGs "
-            "for manual editing and cleanup in Aseprite."
+            "Resize reference images into crisp low-resolution PNGs for Aseprite, "
+            "with optional palette limiting."
         )
     )
     parser.add_argument("input", help="Path to the source image.")
     parser.add_argument("output", help="Path for the converted PNG.")
-    parser.add_argument("--size", type=int, default=80, help="Square output size. Default: 80.")
+    parser.add_argument("--size", type=int, default=128, help="Square output size. Default: 128.")
     parser.add_argument("--width", type=int, help="Output width. Overrides --size.")
     parser.add_argument("--height", type=int, help="Output height. Overrides --size.")
-    parser.add_argument("--colors", type=int, default=16, help="Palette size, 2-256. Default: 16.")
+    parser.add_argument(
+        "--colors",
+        type=int,
+        default=None,
+        help="Optional palette limit, 2-256. Omit to preserve resized colors.",
+    )
     parser.add_argument(
         "--resample",
-        choices=("nearest", "box", "lanczos"),
-        default="nearest",
-        help="Downscaling filter. Default: nearest.",
+        choices=("nearest", "box", "hamming", "bicubic", "lanczos"),
+        default="lanczos",
+        help="Downscaling filter. Default: lanczos.",
     )
     parser.add_argument(
         "--dither",
         choices=("none", "floyd"),
         default="none",
-        help="Palette dithering. Default: none.",
+        help="Palette dithering when --colors is used. Default: none.",
     )
     parser.add_argument(
         "--alpha-threshold",
@@ -189,7 +203,8 @@ def main() -> int:
         crop_transparent=not args.no_crop,
         hard_alpha=not args.keep_soft_alpha,
     )
-    print(f"Saved {output} ({width}x{height}, max {args.colors} visible RGB colors)")
+    color_note = "preserved resized colors" if args.colors is None else f"max {args.colors} visible RGB colors"
+    print(f"Saved {output} ({width}x{height}, {color_note})")
     return 0
 
 
