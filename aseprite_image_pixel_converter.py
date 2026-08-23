@@ -52,13 +52,14 @@ def convert_pil_image(
     alpha_threshold: int = 8,
     resample: ResampleName = "nearest",
     dither: DitherName = "none",
-    crop_transparent: bool = True,
+    crop_transparent: bool = False,
     hard_alpha: bool = True,
 ) -> Image.Image:
     """Return a resized RGBA image suitable for inspection and refinement in Aseprite.
 
-    By default the RGB colors produced by resizing are preserved. Pass ``colors``
-    to intentionally quantize the visible image to a palette of 2-256 colors.
+    Transparent margins are preserved by default. Pass ``crop_transparent=True``
+    only when an explicit crop is desired. RGB colors produced by resizing are
+    preserved unless ``colors`` is provided to intentionally limit the palette.
     """
     if width < 1 or height < 1:
         raise ValueError("width and height must both be at least 1.")
@@ -72,7 +73,8 @@ def convert_pil_image(
         raise ValueError("Unknown dithering mode.")
 
     source = source.convert("RGBA")
-    working = source.crop(_visible_bbox(source, alpha_threshold)) if crop_transparent else source
+    visible_bbox = _visible_bbox(source, alpha_threshold)
+    working = source.crop(visible_bbox) if crop_transparent else source
 
     fitted_size = _fit_size(working.size, (width, height))
     resized = working.resize(fitted_size, _resample_filter(resample))
@@ -112,7 +114,7 @@ def convert_image(
     alpha_threshold: int = 8,
     resample: ResampleName = "nearest",
     dither: DitherName = "none",
-    crop_transparent: bool = True,
+    crop_transparent: bool = False,
     hard_alpha: bool = True,
 ) -> Path:
     """Convert a file on disk and save the resulting PNG."""
@@ -179,9 +181,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Preserve semi-transparent pixels instead of hardening alpha to 0/255.",
     )
     parser.add_argument(
-        "--no-crop",
+        "--crop",
         action="store_true",
-        help="Do not crop transparent margins before fitting the image.",
+        help="Explicitly crop transparent margins before fitting the image.",
     )
     return parser
 
@@ -200,7 +202,7 @@ def main() -> int:
         alpha_threshold=args.alpha_threshold,
         resample=args.resample,
         dither=args.dither,
-        crop_transparent=not args.no_crop,
+        crop_transparent=args.crop,
         hard_alpha=not args.keep_soft_alpha,
     )
     color_note = "preserved resized colors" if args.colors is None else f"max {args.colors} visible RGB colors"
