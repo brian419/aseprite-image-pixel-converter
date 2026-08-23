@@ -99,15 +99,6 @@ def _read_uploaded_rgba() -> tuple[Image.Image, str]:
     return source, upload.filename
 
 
-def _crop_visible_source(source: Image.Image, alpha_threshold: int) -> Image.Image:
-    alpha = source.getchannel("A")
-    mask = alpha.point(lambda value: 255 if value > alpha_threshold else 0)
-    bbox = mask.getbbox()
-    if bbox is None:
-        raise ValueError("The source image has no visible pixels.")
-    return source.crop(bbox)
-
-
 def _convert_request_image() -> tuple[Image.Image, str, int, int, int | None]:
     source, source_name = _read_uploaded_rgba()
 
@@ -128,9 +119,6 @@ def _convert_request_image() -> tuple[Image.Image, str, int, int, int | None]:
     if dither not in {"none", "floyd"}:
         raise ValueError("Unknown dithering mode.")
 
-    crop_transparent = request.form.get("crop_transparent", "true") == "true"
-    hard_alpha = request.form.get("hard_alpha", "true") == "true"
-
     result = convert_pil_image(
         source,
         width=width,
@@ -139,8 +127,8 @@ def _convert_request_image() -> tuple[Image.Image, str, int, int, int | None]:
         alpha_threshold=alpha_threshold,
         resample=resample,
         dither=dither,
-        crop_transparent=crop_transparent,
-        hard_alpha=hard_alpha,
+        crop_transparent=False,
+        hard_alpha=True,
     )
     return result, source_name, width, height, colors
 
@@ -172,12 +160,6 @@ def choose_folder():
 def source_preview():
     try:
         source, _source_name = _read_uploaded_rgba()
-        alpha_threshold = _int_form("alpha_threshold", 8, 0, 254)
-        crop_transparent = request.form.get("crop_transparent", "true") == "true"
-
-        if crop_transparent:
-            source = _crop_visible_source(source, alpha_threshold)
-
         buffer = io.BytesIO()
         source.save(buffer, format="PNG", optimize=False)
         buffer.seek(0)
