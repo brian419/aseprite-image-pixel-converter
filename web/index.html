@@ -21,7 +21,6 @@
       --checker-a: #ececee;
       --checker-b: #f8f8f9;
     }
-
     @media (prefers-color-scheme: dark) {
       :root {
         --bg: #111113;
@@ -39,9 +38,7 @@
         --checker-b: #2d2d30;
       }
     }
-
     * { box-sizing: border-box; }
-
     body {
       margin: 0;
       background: var(--bg);
@@ -49,9 +46,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
       -webkit-font-smoothing: antialiased;
     }
-
     button, input, select { font: inherit; }
-
     button:focus-visible,
     input:focus-visible,
     select:focus-visible,
@@ -60,17 +55,14 @@
       outline: 3px solid color-mix(in srgb, var(--blue) 30%, transparent);
       outline-offset: 2px;
     }
-
     .page {
       width: min(1120px, calc(100% - 40px));
       margin: 0 auto;
       padding: 52px 0 68px;
     }
-
     header { margin-bottom: 28px; }
     h1 { margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -.03em; }
     .subtitle { margin: 9px 0 0; color: var(--secondary); font-size: 16px; line-height: 1.45; }
-
     .app-card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -78,17 +70,14 @@
       overflow: hidden;
       box-shadow: 0 14px 36px rgba(0,0,0,.07);
     }
-
     .comparison-pane {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 24px;
       padding: 28px;
     }
-
     .compare-panel { min-width: 0; }
     .eyebrow { margin: 0; color: var(--secondary); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
-
     .preview-heading-row {
       min-height: 32px;
       display: flex;
@@ -97,10 +86,8 @@
       gap: 12px;
       margin-bottom: 10px;
     }
-
     .source-actions,
     .zoom-controls { display: flex; align-items: center; gap: 6px; }
-
     .secondary-button,
     .preset,
     .zoom-button {
@@ -109,20 +96,16 @@
       color: var(--text);
       cursor: pointer;
     }
-
     .secondary-button,
     .preset {
       min-height: 34px;
       padding: 6px 11px;
       border-radius: 9px;
     }
-
     .secondary-button:hover,
     .preset:hover,
     .zoom-button:hover:not(:disabled) { border-color: var(--border-strong); }
-
     .change-image-button { min-height: 30px; padding: 4px 9px; font-size: 12px; }
-
     .zoom-button {
       width: 30px;
       height: 30px;
@@ -131,10 +114,8 @@
       font-size: 18px;
       line-height: 1;
     }
-
     .zoom-button:disabled { opacity: .4; cursor: default; }
-    .zoom-value { min-width: 48px; color: var(--secondary); font-size: 12px; text-align: center; }
-
+    .zoom-value { min-width: 56px; color: var(--secondary); font-size: 12px; text-align: center; }
     .compare-frame {
       height: 420px;
       border: 1px solid var(--border);
@@ -153,11 +134,9 @@
       user-select: none;
       -webkit-user-select: none;
     }
-
     .compare-frame.has-image { cursor: grab; }
     .compare-frame.has-image.panning { cursor: grabbing; }
     .compare-frame.dragging { border-color: var(--blue); }
-
     .compare-stage {
       width: max-content;
       min-width: 100%;
@@ -167,10 +146,8 @@
       display: grid;
       place-items: center;
     }
-
     .comparison-canvas { display: none; position: relative; flex: none; }
     .compare-frame.has-image .comparison-canvas { display: block; }
-
     .comparison-canvas img {
       width: 100%;
       height: 100%;
@@ -180,10 +157,8 @@
       -webkit-user-drag: none;
       user-select: none;
     }
-
     #sourcePreview { image-rendering: auto; }
     #outputPreview { image-rendering: pixelated; image-rendering: crisp-edges; }
-
     .compare-frame.has-image .preview-empty { display: none; }
     .preview-empty {
       padding: 30px;
@@ -193,7 +168,6 @@
       line-height: 1.45;
       cursor: pointer;
     }
-
     .meta,
     .preview-state {
       margin-top: 9px;
@@ -203,31 +177,24 @@
       line-height: 1.4;
       overflow-wrap: anywhere;
     }
-
     .preview-state.error { color: var(--error); }
-
     .settings-pane {
       padding: 28px;
       border-top: 1px solid var(--border);
     }
-
     .settings-title { margin-bottom: 20px; }
-
     .settings-grid {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 20px 24px;
     }
-
     .control { min-width: 0; }
     .control.full-width,
     details,
     .action { grid-column: 1 / -1; }
-
     .label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
     label { font-size: 13px; font-weight: 600; }
     .hint { color: var(--secondary); font-size: 11px; }
-
     input[type="number"],
     input[type="text"],
     select {
@@ -239,29 +206,23 @@
       background: var(--surface-soft);
       color: var(--text);
     }
-
     .size-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
     .times { color: var(--secondary); }
     .presets { display: flex; gap: 7px; margin-top: 8px; }
-
     .folder-box {
       padding: 11px 12px;
       border: 1px solid var(--border);
       border-radius: 11px;
       background: var(--surface-soft);
     }
-
     .folder-path { margin-top: 8px; color: var(--secondary); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
-
     details { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 2px; }
     summary { color: var(--secondary); cursor: pointer; font-size: 12px; }
     .advanced { padding-top: 15px; }
     .advanced .control { margin-bottom: 16px; }
     .check-row { display: flex; gap: 9px; align-items: center; margin: 12px 0; font-size: 12px; font-weight: 400; }
     .check-row input { width: 16px; height: 16px; accent-color: var(--blue); }
-
     .action { border-top: 1px solid var(--border); padding-top: 20px; }
-
     .primary {
       width: 100%;
       min-height: 44px;
@@ -272,14 +233,12 @@
       font-weight: 600;
       cursor: pointer;
     }
-
     .primary:hover { background: var(--blue-hover); }
     .primary:disabled { opacity: .45; cursor: default; }
     .status { margin-top: 10px; min-height: 20px; color: var(--secondary); font-size: 12px; line-height: 1.45; }
     .status.success { color: var(--success); }
     .status.error { color: var(--error); }
     .privacy { margin: 17px 3px 0; color: var(--secondary); font-size: 11px; line-height: 1.45; }
-
     @media (max-width: 760px) {
       .page { width: min(100% - 24px, 620px); padding-top: 28px; }
       .comparison-pane,
@@ -307,7 +266,6 @@
               <button id="changeImageButton" class="secondary-button change-image-button" type="button" hidden>Change Image…</button>
             </div>
           </div>
-
           <div id="sourceFrame" class="compare-frame" tabindex="0" aria-label="Source image comparison view">
             <div class="compare-stage">
               <div id="sourceCanvas" class="comparison-canvas">
@@ -332,7 +290,6 @@
               <button id="zoomInButton" class="zoom-button" type="button" aria-label="Zoom in" disabled>+</button>
             </div>
           </div>
-
           <div id="outputFrame" class="compare-frame" tabindex="0" aria-label="Converted output comparison view">
             <div class="compare-stage">
               <div id="outputCanvas" class="comparison-canvas">
@@ -347,7 +304,6 @@
 
       <div class="settings-pane">
         <p class="eyebrow settings-title">OUTPUT SETTINGS</p>
-
         <div class="settings-grid">
           <div class="control">
             <div class="label-row"><label for="width">Canvas size</label><span class="hint">pixels</span></div>
@@ -362,12 +318,10 @@
               <button class="preset" type="button" data-size="96">96</button>
             </div>
           </div>
-
           <div class="control">
             <div class="label-row"><label for="colors">Palette colors</label><span class="hint">2–256</span></div>
             <input id="colors" type="number" min="2" max="256" value="16">
           </div>
-
           <div class="control">
             <div class="label-row"><label for="resample">Resize method</label></div>
             <select id="resample">
@@ -376,12 +330,10 @@
               <option value="lanczos">Lanczos — smoother sampling</option>
             </select>
           </div>
-
           <div class="control">
             <div class="label-row"><label for="outputName">File name</label></div>
             <input id="outputName" type="text" value="converted-80x80-16c.png" spellcheck="false">
           </div>
-
           <div class="control full-width">
             <div class="label-row"><label>Save location</label></div>
             <div class="folder-box">
@@ -389,7 +341,6 @@
               <div id="folderPath" class="folder-path">Choose a folder for this conversion.</div>
             </div>
           </div>
-
           <details>
             <summary>Advanced options</summary>
             <div class="advanced">
@@ -404,7 +355,6 @@
               <label class="check-row"><input id="hardAlpha" type="checkbox" checked>Use hard transparent/opaque edges</label>
             </div>
           </details>
-
           <div class="action">
             <button id="convertButton" class="primary" type="button" disabled>Convert Image</button>
             <div id="status" class="status" aria-live="polite">Choose an image and output folder to begin.</div>
@@ -412,7 +362,6 @@
         </div>
       </div>
     </section>
-
     <p class="privacy">The interface is served from localhost. Images are processed locally and are not sent to an external service.</p>
   </main>
 
@@ -452,32 +401,27 @@
     let sourceRequestId = 0;
     let previewZoom = 1;
     let syncingScroll = false;
-    const zoomSteps = [0.5, 1, 2, 3, 4, 6, 8, 12, 16];
+    const zoomSteps = [0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64];
 
     function setStatus(message, kind = '') {
       status.textContent = message;
       status.className = `status ${kind}`.trim();
     }
-
     function setPreviewState(message, kind = '') {
       previewState.textContent = message;
       previewState.className = `preview-state ${kind}`.trim();
     }
-
     function updateConvertState() {
       convertButton.disabled = !(selectedFile && hasOutputFolder);
     }
-
     function baseName(name) {
       const dot = name.lastIndexOf('.');
       return dot > 0 ? name.slice(0, dot) : name;
     }
-
     function refreshSuggestedName() {
       const stem = selectedFile ? baseName(selectedFile.name) : 'converted';
       outputName.value = `${stem}-${widthInput.value}x${heightInput.value}-${colorsInput.value}c.png`;
     }
-
     function buildConversionForm(includeOutputName = false) {
       const form = new FormData();
       form.append('image', selectedFile);
@@ -492,7 +436,6 @@
       if (includeOutputName) form.append('output_name', outputName.value);
       return form;
     }
-
     function buildSourcePreviewForm() {
       const form = new FormData();
       form.append('image', selectedFile);
@@ -500,7 +443,6 @@
       form.append('alpha_threshold', '8');
       return form;
     }
-
     function suggestedPreviewZoom() {
       const width = Number(widthInput.value) || 80;
       const height = Number(heightInput.value) || 80;
@@ -511,7 +453,6 @@
       if (largestSide <= 256) return 2;
       return 1;
     }
-
     function applyCanvasGeometry() {
       const width = Math.max(8, Number(widthInput.value) || 80) * previewZoom;
       const height = Math.max(8, Number(heightInput.value) || 80) * previewZoom;
@@ -524,7 +465,6 @@
       zoomOutButton.disabled = !selectedFile || index <= 0;
       zoomInButton.disabled = !selectedFile || index < 0 || index >= zoomSteps.length - 1;
     }
-
     function viewCenter(frame) {
       const scrollableWidth = Math.max(1, frame.scrollWidth);
       const scrollableHeight = Math.max(1, frame.scrollHeight);
@@ -533,7 +473,6 @@
         y: (frame.scrollTop + frame.clientHeight / 2) / scrollableHeight,
       };
     }
-
     function restoreViewCenter(center) {
       requestAnimationFrame(() => {
         for (const frame of [sourceFrame, outputFrame]) {
@@ -542,14 +481,12 @@
         }
       });
     }
-
     function setPreviewZoom(zoom) {
       const center = viewCenter(outputFrame);
       previewZoom = zoom;
       applyCanvasGeometry();
       restoreViewCenter(center);
     }
-
     function stepPreviewZoom(direction) {
       let index = zoomSteps.indexOf(previewZoom);
       if (index < 0) index = zoomSteps.findIndex(value => value >= previewZoom);
@@ -557,7 +494,6 @@
       index = Math.max(0, Math.min(zoomSteps.length - 1, index + direction));
       setPreviewZoom(zoomSteps[index]);
     }
-
     function syncFrames(source, target) {
       if (syncingScroll) return;
       syncingScroll = true;
@@ -565,7 +501,6 @@
       target.scrollTop = source.scrollTop;
       requestAnimationFrame(() => { syncingScroll = false; });
     }
-
     sourceFrame.addEventListener('scroll', () => syncFrames(sourceFrame, outputFrame));
     outputFrame.addEventListener('scroll', () => syncFrames(outputFrame, sourceFrame));
 
@@ -575,16 +510,12 @@
       let startY = 0;
       let startLeft = 0;
       let startTop = 0;
-
       const stop = pointerId => {
         if (!isPanning) return;
         isPanning = false;
         frame.classList.remove('panning');
-        if (pointerId !== null && frame.hasPointerCapture(pointerId)) {
-          frame.releasePointerCapture(pointerId);
-        }
+        if (pointerId !== null && frame.hasPointerCapture(pointerId)) frame.releasePointerCapture(pointerId);
       };
-
       frame.addEventListener('pointerdown', event => {
         if (!frame.classList.contains('has-image') || event.button !== 0) return;
         isPanning = true;
@@ -596,19 +527,16 @@
         frame.setPointerCapture(event.pointerId);
         event.preventDefault();
       });
-
       frame.addEventListener('pointermove', event => {
         if (!isPanning) return;
         frame.scrollLeft = startLeft - (event.clientX - startX);
         frame.scrollTop = startTop - (event.clientY - startY);
         event.preventDefault();
       });
-
       frame.addEventListener('pointerup', event => stop(event.pointerId));
       frame.addEventListener('pointercancel', event => stop(event.pointerId));
       frame.addEventListener('lostpointercapture', () => stop(null));
     }
-
     enablePanning(sourceFrame);
     enablePanning(outputFrame);
     sourcePreview.addEventListener('dragstart', event => event.preventDefault());
@@ -617,17 +545,12 @@
     async function renderSourceComparison() {
       if (!selectedFile) return;
       const requestId = ++sourceRequestId;
-
       try {
-        const response = await fetch('/api/source-preview', {
-          method: 'POST',
-          body: buildSourcePreviewForm(),
-        });
+        const response = await fetch('/api/source-preview', { method: 'POST', body: buildSourcePreviewForm() });
         if (!response.ok) {
           const data = await response.json();
           throw new Error(data.error || 'Source preview could not be generated.');
         }
-
         const blob = await response.blob();
         if (requestId !== sourceRequestId) return;
         if (sourcePreviewUrl) URL.revokeObjectURL(sourcePreviewUrl);
@@ -640,24 +563,17 @@
         setPreviewState(error.message, 'error');
       }
     }
-
     async function renderOutputPreview() {
       if (!selectedFile) return;
       const requestId = ++previewRequestId;
       setPreviewState('Updating preview…');
-
       try {
-        const response = await fetch('/api/preview', {
-          method: 'POST',
-          body: buildConversionForm(false),
-        });
-
+        const response = await fetch('/api/preview', { method: 'POST', body: buildConversionForm(false) });
         if (!response.ok) {
           const contentType = response.headers.get('content-type') || '';
           const data = contentType.includes('application/json') ? await response.json() : {};
           throw new Error(data.error || 'Preview could not be generated.');
         }
-
         const blob = await response.blob();
         if (requestId !== previewRequestId) return;
         if (outputPreviewUrl) URL.revokeObjectURL(outputPreviewUrl);
@@ -671,19 +587,16 @@
         setPreviewState(error.message, 'error');
       }
     }
-
     function scheduleOutputPreview() {
       if (!selectedFile) return;
       window.clearTimeout(previewTimer);
       previewTimer = window.setTimeout(renderOutputPreview, 250);
     }
-
     async function chooseFile(file) {
       if (!file || !file.type.startsWith('image/')) {
         setStatus('Choose a PNG, JPEG, or WebP image.', 'error');
         return;
       }
-
       selectedFile = file;
       fileMeta.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
       changeImageButton.hidden = false;
@@ -700,32 +613,24 @@
       scheduleOutputPreview();
     }
 
-    sourceFrame.addEventListener('click', () => {
-      if (!selectedFile) fileInput.click();
-    });
-
+    sourceFrame.addEventListener('click', () => { if (!selectedFile) fileInput.click(); });
     sourceFrame.addEventListener('keydown', event => {
       if (!selectedFile && (event.key === 'Enter' || event.key === ' ')) {
         event.preventDefault();
         fileInput.click();
       }
     });
-
     changeImageButton.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', () => chooseFile(fileInput.files[0]));
-
     ['dragenter', 'dragover'].forEach(type => sourceFrame.addEventListener(type, event => {
       event.preventDefault();
       sourceFrame.classList.add('dragging');
     }));
-
     ['dragleave', 'drop'].forEach(type => sourceFrame.addEventListener(type, event => {
       event.preventDefault();
       sourceFrame.classList.remove('dragging');
     }));
-
     sourceFrame.addEventListener('drop', event => chooseFile(event.dataTransfer.files[0]));
-
     document.querySelectorAll('.preset').forEach(button => button.addEventListener('click', () => {
       widthInput.value = button.dataset.size;
       heightInput.value = button.dataset.size;
@@ -734,42 +639,34 @@
       applyCanvasGeometry();
       scheduleOutputPreview();
     }));
-
     [widthInput, heightInput].forEach(input => input.addEventListener('input', () => {
       refreshSuggestedName();
       applyCanvasGeometry();
       scheduleOutputPreview();
     }));
-
     colorsInput.addEventListener('input', () => {
       refreshSuggestedName();
       scheduleOutputPreview();
     });
-
     [resampleInput, ditherInput, hardAlpha].forEach(input => input.addEventListener('change', scheduleOutputPreview));
-
     cropTransparent.addEventListener('change', () => {
       renderSourceComparison();
       scheduleOutputPreview();
     });
-
     zoomOutButton.addEventListener('click', () => stepPreviewZoom(-1));
     zoomInButton.addEventListener('click', () => stepPreviewZoom(1));
 
     folderButton.addEventListener('click', async () => {
       folderButton.disabled = true;
       setStatus('Opening folder chooser…');
-
       try {
         const response = await fetch('/api/choose-folder', { method: 'POST' });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Could not choose a folder.');
-
         if (data.cancelled) {
           setStatus(selectedFile ? 'Choose an output folder.' : 'Choose an image and output folder to begin.');
           return;
         }
-
         hasOutputFolder = true;
         folderPath.textContent = data.path;
         updateConvertState();
@@ -780,21 +677,14 @@
         folderButton.disabled = false;
       }
     });
-
     convertButton.addEventListener('click', async () => {
       if (!selectedFile || !hasOutputFolder) return;
-
       convertButton.disabled = true;
       setStatus('Converting…');
-
       try {
-        const response = await fetch('/api/convert', {
-          method: 'POST',
-          body: buildConversionForm(true),
-        });
+        const response = await fetch('/api/convert', { method: 'POST', body: buildConversionForm(true) });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Conversion failed.');
-
         hasOutputFolder = false;
         folderPath.textContent = 'Choose a folder for the next conversion.';
         updateConvertState();
