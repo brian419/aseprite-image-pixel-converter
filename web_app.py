@@ -42,13 +42,21 @@ def _safe_stem(filename: str) -> str:
     return stem[:100] or "converted-image"
 
 
-def _safe_output_name(requested: str, source_name: str, width: int, height: int, colors: int) -> str:
+def _safe_output_name(
+    requested: str,
+    source_name: str,
+    width: int,
+    height: int,
+    colors: int | None,
+) -> str:
     requested = requested.strip()
     if requested.lower().endswith(".png"):
         name = Path(requested).name
         stem = _safe_stem(name)
         return f"{stem}.png" if not stem.lower().endswith(".png") else stem
-    return f"{_safe_stem(source_name)}-{width}x{height}-{colors}c.png"
+
+    suffix = f"-{colors}c" if colors is not None else ""
+    return f"{_safe_stem(source_name)}-{width}x{height}{suffix}.png"
 
 
 def _choose_output_folder() -> Path | None:
@@ -92,16 +100,20 @@ def _crop_visible_source(source: Image.Image, alpha_threshold: int) -> Image.Ima
     return source.crop(bbox)
 
 
-def _convert_request_image() -> tuple[Image.Image, str, int, int, int]:
+def _convert_request_image() -> tuple[Image.Image, str, int, int, int | None]:
     source, source_name = _read_uploaded_rgba()
 
-    width = _int_form("width", 80, 8, 1024)
-    height = _int_form("height", 80, 8, 1024)
-    colors = _int_form("colors", 16, 2, 256)
+    width = _int_form("width", 128, 8, 1024)
+    height = _int_form("height", 128, 8, 1024)
     alpha_threshold = _int_form("alpha_threshold", 8, 0, 254)
 
-    resample = request.form.get("resample", "box")
-    if resample not in {"nearest", "box", "lanczos"}:
+    color_mode = request.form.get("color_mode", "preserve")
+    if color_mode not in {"preserve", "limit"}:
+        raise ValueError("Unknown color handling mode.")
+    colors = _int_form("colors", 32, 2, 256) if color_mode == "limit" else None
+
+    resample = request.form.get("resample", "lanczos")
+    if resample not in {"nearest", "box", "hamming", "bicubic", "lanczos"}:
         raise ValueError("Unknown resize method.")
 
     dither = request.form.get("dither", "none")
