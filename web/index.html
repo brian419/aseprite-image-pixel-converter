@@ -50,7 +50,6 @@
     button:focus-visible,
     input:focus-visible,
     select:focus-visible,
-    summary:focus-visible,
     .compare-frame:focus-visible {
       outline: 3px solid color-mix(in srgb, var(--blue) 30%, transparent);
       outline-offset: 2px;
@@ -190,9 +189,7 @@
     }
     .control { min-width: 0; }
     .control.full-width,
-    details,
     .action { grid-column: 1 / -1; }
-    .control.hidden { display: none; }
     .control.inactive { opacity: .58; }
     .label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
     label { font-size: 13px; font-weight: 600; }
@@ -220,12 +217,6 @@
       background: var(--surface-soft);
     }
     .folder-path { margin-top: 8px; color: var(--secondary); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
-    details { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 2px; }
-    summary { color: var(--secondary); cursor: pointer; font-size: 12px; }
-    .advanced { padding-top: 15px; }
-    .advanced .control { margin-bottom: 16px; }
-    .check-row { display: flex; gap: 9px; align-items: center; margin: 12px 0; font-size: 12px; font-weight: 400; }
-    .check-row input { width: 16px; height: 16px; accent-color: var(--blue); }
     .action { border-top: 1px solid var(--border); padding-top: 20px; }
     .primary {
       width: 100%;
@@ -249,7 +240,6 @@
       .settings-grid { grid-template-columns: 1fr; }
       .compare-frame { height: 340px; }
       .control.full-width,
-      details,
       .action { grid-column: auto; }
     }
   </style>
@@ -364,21 +354,6 @@
             </div>
           </div>
 
-          <details>
-            <summary>Advanced options</summary>
-            <div class="advanced">
-              <div id="ditherControl" class="control hidden">
-                <div class="label-row"><label for="dither">Dithering</label></div>
-                <select id="dither">
-                  <option value="none" selected>None</option>
-                  <option value="floyd">Floyd–Steinberg</option>
-                </select>
-              </div>
-              <label class="check-row"><input id="cropTransparent" type="checkbox" checked>Crop transparent margins before resizing</label>
-              <label class="check-row"><input id="hardAlpha" type="checkbox" checked>Use hard transparent/opaque edges</label>
-            </div>
-          </details>
-
           <div class="action">
             <button id="convertButton" class="primary" type="button" disabled>Convert Image</button>
             <div id="status" class="status" aria-live="polite">Choose an image and output folder to begin.</div>
@@ -410,10 +385,6 @@
     const colorsInput = document.getElementById('colors');
     const resampleInput = document.getElementById('resample');
     const outputName = document.getElementById('outputName');
-    const ditherControl = document.getElementById('ditherControl');
-    const ditherInput = document.getElementById('dither');
-    const cropTransparent = document.getElementById('cropTransparent');
-    const hardAlpha = document.getElementById('hardAlpha');
     const folderButton = document.getElementById('folderButton');
     const folderPath = document.getElementById('folderPath');
     const convertButton = document.getElementById('convertButton');
@@ -452,14 +423,12 @@
       const limited = paletteIsLimited();
       colorsInput.disabled = !limited;
       paletteControl.classList.toggle('inactive', !limited);
-      ditherControl.classList.toggle('hidden', !limited);
     }
     function refreshSuggestedName() {
       const stem = selectedFile ? baseName(selectedFile.name) : 'converted';
       const parts = [stem, `${widthInput.value}x${heightInput.value}`, resampleInput.value];
       if (paletteIsLimited()) {
         parts.push(`${colorsInput.value}c`);
-        if (ditherInput.value === 'floyd') parts.push('floyd');
       } else {
         parts.push('preserve');
       }
@@ -473,9 +442,6 @@
       form.append('color_mode', colorModeInput.value);
       form.append('colors', colorsInput.value);
       form.append('resample', resampleInput.value);
-      form.append('dither', ditherInput.value);
-      form.append('crop_transparent', String(cropTransparent.checked));
-      form.append('hard_alpha', String(hardAlpha.checked));
       form.append('alpha_threshold', '8');
       if (includeOutputName) form.append('output_name', outputName.value);
       return form;
@@ -483,7 +449,6 @@
     function buildSourcePreviewForm() {
       const form = new FormData();
       form.append('image', selectedFile);
-      form.append('crop_transparent', String(cropTransparent.checked));
       form.append('alpha_threshold', '8');
       return form;
     }
@@ -701,15 +666,6 @@
     });
     resampleInput.addEventListener('change', () => {
       refreshSuggestedName();
-      scheduleOutputPreview();
-    });
-    ditherInput.addEventListener('change', () => {
-      refreshSuggestedName();
-      scheduleOutputPreview();
-    });
-    hardAlpha.addEventListener('change', scheduleOutputPreview);
-    cropTransparent.addEventListener('change', () => {
-      renderSourceComparison();
       scheduleOutputPreview();
     });
     zoomOutButton.addEventListener('click', () => stepPreviewZoom(-1));
