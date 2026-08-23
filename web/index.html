@@ -18,6 +18,8 @@
       --blue-hover: #0077ed;
       --success: #1f7a45;
       --error: #b42318;
+      --checker-a: #ececee;
+      --checker-b: #f8f8f9;
     }
 
     @media (prefers-color-scheme: dark) {
@@ -33,6 +35,8 @@
         --blue-hover: #40a9ff;
         --success: #67ce8b;
         --error: #ff7b72;
+        --checker-a: #252527;
+        --checker-b: #2d2d30;
       }
     }
 
@@ -88,6 +92,36 @@
     .empty span { display: block; margin-top: 6px; color: var(--secondary); font-size: 13px; line-height: 1.45; }
     .meta { margin-top: 11px; min-height: 18px; color: var(--secondary); font-size: 12px; overflow-wrap: anywhere; }
 
+    .output-preview-section { margin-top: 28px; }
+    .output-preview-frame {
+      min-height: 250px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background-color: var(--checker-b);
+      background-image:
+        linear-gradient(45deg, var(--checker-a) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--checker-a) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--checker-a) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--checker-a) 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    }
+    .output-preview-frame img {
+      display: none;
+      max-width: 100%;
+      max-height: 330px;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+    .output-preview-frame.has-preview img { display: block; }
+    .output-preview-frame.has-preview .preview-empty { display: none; }
+    .preview-empty { padding: 30px; text-align: center; color: var(--secondary); font-size: 13px; line-height: 1.45; }
+    .preview-state { margin-top: 9px; min-height: 18px; color: var(--secondary); font-size: 12px; }
+    .preview-state.error { color: var(--error); }
+
     .control { margin-bottom: 20px; }
     .label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
     label { font-size: 13px; font-weight: 600; }
@@ -139,6 +173,7 @@
       .app-card { grid-template-columns: 1fr; }
       .preview-pane { border-right: 0; border-bottom: 1px solid var(--border); }
       .drop-zone { min-height: 280px; }
+      .output-preview-frame { min-height: 220px; }
     }
   </style>
 </head>
@@ -153,7 +188,7 @@
       <div class="preview-pane">
         <p class="eyebrow">SOURCE IMAGE</p>
         <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Choose or drop an image">
-          <img id="preview" alt="Selected image preview">
+          <img id="sourcePreview" alt="Selected source image preview">
           <div class="empty">
             <strong>Drop an image here</strong>
             <span>or click to choose a PNG, JPEG, or WebP file</span>
@@ -161,6 +196,15 @@
         </div>
         <div id="fileMeta" class="meta">No image selected</div>
         <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+
+        <div class="output-preview-section">
+          <p class="eyebrow">OUTPUT PREVIEW</p>
+          <div id="outputPreviewFrame" class="output-preview-frame">
+            <img id="outputPreview" alt="Converted output preview">
+            <div class="preview-empty">Choose a source image to preview the converted result.</div>
+          </div>
+          <div id="previewState" class="preview-state">The preview updates automatically when conversion settings change.</div>
+        </div>
       </div>
 
       <div class="settings-pane">
@@ -235,8 +279,11 @@
   <script>
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
-    const preview = document.getElementById('preview');
+    const sourcePreview = document.getElementById('sourcePreview');
     const fileMeta = document.getElementById('fileMeta');
+    const outputPreviewFrame = document.getElementById('outputPreviewFrame');
+    const outputPreview = document.getElementById('outputPreview');
+    const previewState = document.getElementById('previewState');
     const widthInput = document.getElementById('width');
     const heightInput = document.getElementById('height');
     const colorsInput = document.getElementById('colors');
@@ -251,12 +298,20 @@
     const status = document.getElementById('status');
 
     let selectedFile = null;
-    let previewUrl = null;
+    let sourcePreviewUrl = null;
+    let outputPreviewUrl = null;
     let hasOutputFolder = false;
+    let previewTimer = null;
+    let previewRequestId = 0;
 
     function setStatus(message, kind = '') {
       status.textContent = message;
       status.className = `status ${kind}`.trim();
+    }
+
+    function setPreviewState(message, kind = '') {
+      previewState.textContent = message;
+      previewState.className = `preview-state ${kind}`.trim();
     }
 
     function updateConvertState() {
@@ -273,20 +328,75 @@
       outputName.value = `${stem}-${widthInput.value}x${heightInput.value}-${colorsInput.value}c.png`;
     }
 
+    function buildConversionForm(includeOutputName = false) {
+      const form = new FormData();
+      form.append('image', selectedFile);
+      form.append('width', widthInput.value);
+      form.append('height', heightInput.value);
+      form.append('colors', colorsInput.value);
+      form.append('resample', resampleInput.value);
+      form.append('dither', ditherInput.value);
+      form.append('crop_transparent', String(cropTransparent.checked));
+      form.append('hard_alpha', String(hardAlpha.checked));
+      form.append('alpha_threshold', '8');
+      if (includeOutputName) form.append('output_name', outputName.value);
+      return form;
+    }
+
+    async function renderOutputPreview() {
+      if (!selectedFile) return;
+
+      const requestId = ++previewRequestId;
+      setPreviewState('Updating preview…');
+
+      try {
+        const response = await fetch('/api/preview', {
+          method: 'POST',
+          body: buildConversionForm(false),
+        });
+
+        if (!response.ok) {
+          const contentType = response.headers.get('content-type') || '';
+          const data = contentType.includes('application/json') ? await response.json() : {};
+          throw new Error(data.error || 'Preview could not be generated.');
+        }
+
+        const blob = await response.blob();
+        if (requestId !== previewRequestId) return;
+
+        if (outputPreviewUrl) URL.revokeObjectURL(outputPreviewUrl);
+        outputPreviewUrl = URL.createObjectURL(blob);
+        outputPreview.src = outputPreviewUrl;
+        outputPreviewFrame.classList.add('has-preview');
+        setPreviewState(`${widthInput.value} × ${heightInput.value} · up to ${colorsInput.value} colors`);
+      } catch (error) {
+        if (requestId !== previewRequestId) return;
+        outputPreviewFrame.classList.remove('has-preview');
+        setPreviewState(error.message, 'error');
+      }
+    }
+
+    function scheduleOutputPreview() {
+      if (!selectedFile) return;
+      window.clearTimeout(previewTimer);
+      previewTimer = window.setTimeout(renderOutputPreview, 250);
+    }
+
     function chooseFile(file) {
       if (!file || !file.type.startsWith('image/')) {
         setStatus('Choose a PNG, JPEG, or WebP image.', 'error');
         return;
       }
       selectedFile = file;
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      previewUrl = URL.createObjectURL(file);
-      preview.src = previewUrl;
+      if (sourcePreviewUrl) URL.revokeObjectURL(sourcePreviewUrl);
+      sourcePreviewUrl = URL.createObjectURL(file);
+      sourcePreview.src = sourcePreviewUrl;
       dropZone.classList.add('has-image');
       fileMeta.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
       refreshSuggestedName();
       updateConvertState();
       setStatus(hasOutputFolder ? 'Ready to convert.' : 'Choose an output folder.');
+      scheduleOutputPreview();
     }
 
     dropZone.addEventListener('click', () => fileInput.click());
@@ -312,8 +422,14 @@
       widthInput.value = button.dataset.size;
       heightInput.value = button.dataset.size;
       refreshSuggestedName();
+      scheduleOutputPreview();
     }));
-    [widthInput, heightInput, colorsInput].forEach(input => input.addEventListener('change', refreshSuggestedName));
+
+    [widthInput, heightInput, colorsInput].forEach(input => input.addEventListener('input', () => {
+      refreshSuggestedName();
+      scheduleOutputPreview();
+    }));
+    [resampleInput, ditherInput, cropTransparent, hardAlpha].forEach(input => input.addEventListener('change', scheduleOutputPreview));
 
     folderButton.addEventListener('click', async () => {
       folderButton.disabled = true;
@@ -343,20 +459,11 @@
       convertButton.disabled = true;
       setStatus('Converting…');
 
-      const form = new FormData();
-      form.append('image', selectedFile);
-      form.append('width', widthInput.value);
-      form.append('height', heightInput.value);
-      form.append('colors', colorsInput.value);
-      form.append('resample', resampleInput.value);
-      form.append('dither', ditherInput.value);
-      form.append('crop_transparent', String(cropTransparent.checked));
-      form.append('hard_alpha', String(hardAlpha.checked));
-      form.append('alpha_threshold', '8');
-      form.append('output_name', outputName.value);
-
       try {
-        const response = await fetch('/api/convert', { method: 'POST', body: form });
+        const response = await fetch('/api/convert', {
+          method: 'POST',
+          body: buildConversionForm(true),
+        });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Conversion failed.');
 
