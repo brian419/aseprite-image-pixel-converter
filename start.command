@@ -10,10 +10,10 @@ fi
 
 source .venv/bin/activate
 
-if ! python3 -c 'import flask, PIL' >/dev/null 2>&1; then
+if ! python3 -c 'import flask, PIL, waitress' >/dev/null 2>&1; then
   echo "Installing required local packages..."
-  python3 -m pip install --upgrade pip
-  python3 -m pip install -r requirements.txt
+  python3 -m pip install --upgrade pip --quiet
+  python3 -m pip install -r requirements.txt --quiet
 fi
 
 echo "Starting Aseprite Image Pixel Converter..."
