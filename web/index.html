@@ -192,6 +192,7 @@
     .control.full-width,
     details,
     .action { grid-column: 1 / -1; }
+    .control.hidden { display: none; }
     .label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
     label { font-size: 13px; font-weight: 600; }
     .hint { color: var(--secondary); font-size: 11px; }
@@ -208,7 +209,7 @@
     }
     .size-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
     .times { color: var(--secondary); }
-    .presets { display: flex; gap: 7px; margin-top: 8px; }
+    .presets { display: flex; gap: 7px; margin-top: 8px; flex-wrap: wrap; }
     .folder-box {
       padding: 11px 12px;
       border: 1px solid var(--border);
@@ -254,7 +255,7 @@
   <main class="page">
     <header>
       <h1>Aseprite Image Pixel Converter</h1>
-      <p class="subtitle">Convert large reference images into smaller, palette-limited PNGs for cleanup and refinement in Aseprite.</p>
+      <p class="subtitle">Convert large reference images into crisp, low-resolution PNGs for cleanup and refinement in Aseprite.</p>
     </header>
 
     <section class="app-card" aria-label="Image converter">
@@ -308,32 +309,48 @@
           <div class="control">
             <div class="label-row"><label for="width">Canvas size</label><span class="hint">pixels</span></div>
             <div class="size-row">
-              <input id="width" type="number" min="8" max="1024" value="80" aria-label="Output width">
+              <input id="width" type="number" min="8" max="1024" value="128" aria-label="Output width">
               <span class="times">×</span>
-              <input id="height" type="number" min="8" max="1024" value="80" aria-label="Output height">
+              <input id="height" type="number" min="8" max="1024" value="128" aria-label="Output height">
             </div>
             <div class="presets">
               <button class="preset" type="button" data-size="64">64</button>
               <button class="preset" type="button" data-size="80">80</button>
               <button class="preset" type="button" data-size="96">96</button>
+              <button class="preset" type="button" data-size="128">128</button>
+              <button class="preset" type="button" data-size="160">160</button>
             </div>
           </div>
+
           <div class="control">
-            <div class="label-row"><label for="colors">Palette colors</label><span class="hint">2–256</span></div>
-            <input id="colors" type="number" min="2" max="256" value="16">
+            <div class="label-row"><label for="colorMode">Color handling</label></div>
+            <select id="colorMode">
+              <option value="preserve" selected>Preserve resized colors</option>
+              <option value="limit">Limit palette</option>
+            </select>
           </div>
+
+          <div id="paletteControl" class="control hidden">
+            <div class="label-row"><label for="colors">Palette colors</label><span class="hint">2–256</span></div>
+            <input id="colors" type="number" min="2" max="256" value="32">
+          </div>
+
           <div class="control">
             <div class="label-row"><label for="resample">Resize method</label></div>
             <select id="resample">
-              <option value="box" selected>Box — recommended for large references</option>
-              <option value="nearest">Nearest — most literal</option>
-              <option value="lanczos">Lanczos — smoother sampling</option>
+              <option value="lanczos" selected>Lanczos — highest detail retention</option>
+              <option value="bicubic">Bicubic — balanced</option>
+              <option value="hamming">Hamming — sharper reduction</option>
+              <option value="box">Box — simple area averaging</option>
+              <option value="nearest">Nearest — literal sampling</option>
             </select>
           </div>
+
           <div class="control">
             <div class="label-row"><label for="outputName">File name</label></div>
-            <input id="outputName" type="text" value="converted-80x80-16c.png" spellcheck="false">
+            <input id="outputName" type="text" value="converted-128x128.png" spellcheck="false">
           </div>
+
           <div class="control full-width">
             <div class="label-row"><label>Save location</label></div>
             <div class="folder-box">
@@ -341,10 +358,11 @@
               <div id="folderPath" class="folder-path">Choose a folder for this conversion.</div>
             </div>
           </div>
+
           <details>
             <summary>Advanced options</summary>
             <div class="advanced">
-              <div class="control">
+              <div id="ditherControl" class="control hidden">
                 <div class="label-row"><label for="dither">Dithering</label></div>
                 <select id="dither">
                   <option value="none" selected>None</option>
@@ -355,6 +373,7 @@
               <label class="check-row"><input id="hardAlpha" type="checkbox" checked>Use hard transparent/opaque edges</label>
             </div>
           </details>
+
           <div class="action">
             <button id="convertButton" class="primary" type="button" disabled>Convert Image</button>
             <div id="status" class="status" aria-live="polite">Choose an image and output folder to begin.</div>
@@ -381,9 +400,12 @@
     const zoomValue = document.getElementById('zoomValue');
     const widthInput = document.getElementById('width');
     const heightInput = document.getElementById('height');
+    const colorModeInput = document.getElementById('colorMode');
+    const paletteControl = document.getElementById('paletteControl');
     const colorsInput = document.getElementById('colors');
     const resampleInput = document.getElementById('resample');
     const outputName = document.getElementById('outputName');
+    const ditherControl = document.getElementById('ditherControl');
     const ditherInput = document.getElementById('dither');
     const cropTransparent = document.getElementById('cropTransparent');
     const hardAlpha = document.getElementById('hardAlpha');
@@ -418,15 +440,25 @@
       const dot = name.lastIndexOf('.');
       return dot > 0 ? name.slice(0, dot) : name;
     }
+    function paletteIsLimited() {
+      return colorModeInput.value === 'limit';
+    }
+    function refreshColorControls() {
+      const limited = paletteIsLimited();
+      paletteControl.classList.toggle('hidden', !limited);
+      ditherControl.classList.toggle('hidden', !limited);
+    }
     function refreshSuggestedName() {
       const stem = selectedFile ? baseName(selectedFile.name) : 'converted';
-      outputName.value = `${stem}-${widthInput.value}x${heightInput.value}-${colorsInput.value}c.png`;
+      const paletteSuffix = paletteIsLimited() ? `-${colorsInput.value}c` : '';
+      outputName.value = `${stem}-${widthInput.value}x${heightInput.value}${paletteSuffix}.png`;
     }
     function buildConversionForm(includeOutputName = false) {
       const form = new FormData();
       form.append('image', selectedFile);
       form.append('width', widthInput.value);
       form.append('height', heightInput.value);
+      form.append('color_mode', colorModeInput.value);
       form.append('colors', colorsInput.value);
       form.append('resample', resampleInput.value);
       form.append('dither', ditherInput.value);
@@ -444,8 +476,8 @@
       return form;
     }
     function suggestedPreviewZoom() {
-      const width = Number(widthInput.value) || 80;
-      const height = Number(heightInput.value) || 80;
+      const width = Number(widthInput.value) || 128;
+      const height = Number(heightInput.value) || 128;
       const largestSide = Math.max(width, height);
       if (largestSide <= 64) return 6;
       if (largestSide <= 96) return 4;
@@ -454,8 +486,8 @@
       return 1;
     }
     function applyCanvasGeometry() {
-      const width = Math.max(8, Number(widthInput.value) || 80) * previewZoom;
-      const height = Math.max(8, Number(heightInput.value) || 80) * previewZoom;
+      const width = Math.max(8, Number(widthInput.value) || 128) * previewZoom;
+      const height = Math.max(8, Number(heightInput.value) || 128) * previewZoom;
       for (const canvas of [sourceCanvas, outputCanvas]) {
         canvas.style.width = `${width}px`;
         canvas.style.height = `${height}px`;
@@ -580,7 +612,8 @@
         outputPreviewUrl = URL.createObjectURL(blob);
         outputPreview.src = outputPreviewUrl;
         outputFrame.classList.add('has-image');
-        setPreviewState(`${widthInput.value} × ${heightInput.value} · up to ${colorsInput.value} colors`);
+        const colorText = paletteIsLimited() ? `up to ${colorsInput.value} colors` : 'resized colors preserved';
+        setPreviewState(`${widthInput.value} × ${heightInput.value} · ${colorText}`);
       } catch (error) {
         if (requestId !== previewRequestId) return;
         outputFrame.classList.remove('has-image');
@@ -631,6 +664,7 @@
       sourceFrame.classList.remove('dragging');
     }));
     sourceFrame.addEventListener('drop', event => chooseFile(event.dataTransfer.files[0]));
+
     document.querySelectorAll('.preset').forEach(button => button.addEventListener('click', () => {
       widthInput.value = button.dataset.size;
       heightInput.value = button.dataset.size;
@@ -644,9 +678,14 @@
       applyCanvasGeometry();
       scheduleOutputPreview();
     }));
-    colorsInput.addEventListener('input', () => {
+    colorModeInput.addEventListener('change', () => {
+      refreshColorControls();
       refreshSuggestedName();
       scheduleOutputPreview();
+    });
+    colorsInput.addEventListener('input', () => {
+      refreshSuggestedName();
+      if (paletteIsLimited()) scheduleOutputPreview();
     });
     [resampleInput, ditherInput, hardAlpha].forEach(input => input.addEventListener('change', scheduleOutputPreview));
     cropTransparent.addEventListener('change', () => {
@@ -694,6 +733,8 @@
         setStatus(error.message, 'error');
       }
     });
+
+    refreshColorControls();
   </script>
 </body>
 </html>
