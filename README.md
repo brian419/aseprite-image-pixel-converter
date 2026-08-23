@@ -2,7 +2,7 @@
 
 A local utility for converting large reference images into crisp, low-resolution PNGs for refinement in Aseprite.
 
-The converter is designed for source images that have useful visual structure but are too large or too soft to edit comfortably as pixel art. It resizes the image onto a controlled pixel grid while preserving transparency and composition. Color reduction is optional rather than mandatory, allowing detail to be retained when the source benefits from a broader range of resized colors.
+The converter is designed for source images that have useful visual structure but are too large or too soft to edit comfortably as pixel art. It resizes the image onto a controlled pixel grid while preserving transparency, transparent margins, and overall composition. Color reduction is optional rather than mandatory, allowing detail to be retained when the source benefits from a broader range of resized colors.
 
 ## Overview
 
@@ -48,7 +48,8 @@ The converter is intended as a preparation tool, not a replacement for manual pi
 - Descriptive filenames generated from the selected conversion settings.
 - Native folder chooser for explicit output selection.
 - Configurable output width and height.
-- Transparent-background preservation and automatic edge cleanup.
+- Transparent-background preservation.
+- Transparent margins are preserved rather than cropped.
 - Aspect-ratio preservation and automatic centering.
 - Command-line interface for advanced or scripted use.
 - Unit tests for the image converter and local web backend.
@@ -107,6 +108,8 @@ http://127.0.0.1:8765
 
 A destination folder is selected for each conversion. Previewing does not save a file and does not require an output folder.
 
+The source image's transparent margins are kept as part of the composition. The web interface does not crop them before resizing.
+
 ### Generated filenames
 
 The suggested filename updates automatically when the main conversion settings change. The default preserve-colors format is:
@@ -145,7 +148,7 @@ The best method depends on the source. The linked preview makes it possible to c
 
 ## Command-Line Interface
 
-The underlying converter remains available directly. The default CLI path preserves resized colors and uses Nearest resizing:
+The underlying converter remains available directly. The default CLI path preserves resized colors, transparent margins, and uses Nearest resizing:
 
 ```bash
 python3 aseprite_image_pixel_converter.py input.png output.png --size 128
@@ -156,6 +159,8 @@ To deliberately limit the palette:
 ```bash
 python3 aseprite_image_pixel_converter.py input.png output.png --size 128 --colors 32
 ```
+
+The CLI can explicitly crop transparent margins with `--crop`, but cropping is not the default and is not exposed in the browser interface.
 
 View all options:
 
