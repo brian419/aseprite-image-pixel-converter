@@ -47,7 +47,7 @@ def _safe_output_name(requested: str, source_name: str, width: int, height: int,
     return f"{_safe_stem(source_name)}-{width}x{height}-{colors}c.png"
 
 
-def _choose_macos_folder() -> Path | None:
+def _choose_native_folder() -> Path | None:
     script = 'POSIX path of (choose folder with prompt "Choose where converted images should be saved")'
     completed = subprocess.run(
         ["osascript", "-e", script],
@@ -60,12 +60,12 @@ def _choose_macos_folder() -> Path | None:
         path = Path(completed.stdout.strip()).expanduser()
         if path.is_dir():
             return path.resolve()
-        raise RuntimeError("macOS returned an invalid folder.")
+        raise RuntimeError("The folder chooser returned an invalid folder.")
 
     error_text = completed.stderr.strip()
     if "User canceled" in error_text or "(-128)" in error_text:
         return None
-    raise RuntimeError(error_text or "Could not open the macOS folder chooser.")
+    raise RuntimeError(error_text or "Could not open the folder chooser.")
 
 
 @app.get("/")
@@ -82,7 +82,7 @@ def health():
 def choose_folder():
     global _selected_output_directory
     try:
-        selected = _choose_macos_folder()
+        selected = _choose_native_folder()
         if selected is None:
             return jsonify({"cancelled": True})
         _selected_output_directory = selected
