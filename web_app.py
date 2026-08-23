@@ -72,10 +72,28 @@ def _choose_output_folder() -> Path | None:
     raise RuntimeError(error_text or "Could not open the folder chooser.")
 
 
-def _convert_request_image() -> tuple[Image.Image, str, int, int, int]:
+def _read_uploaded_rgba() -> tuple[Image.Image, str]:
     upload = request.files.get("image")
     if upload is None or not upload.filename:
         raise ValueError("Choose an image first.")
+
+    with Image.open(upload.stream) as opened:
+        source = opened.convert("RGBA")
+
+    return source, upload.filename
+
+
+def _crop_visible_source(source: Image.Image, alpha_threshold: int) -> Image.Image:
+    alpha = source.getchannel("A")
+    mask = alpha.point(lambda value: 255 if value > alpha_threshold else 0)
+    bbox = mask.getbbox()
+    if bbox is None:
+        raise ValueError("The source image has no visible pixels.")
+    return source.crop(bbox)
+
+
+def _convert_request_image() -> tuple[Image.Image, str, int, int, int]:
+    source, source_name = _read_uploaded_rgba()
 
     width = _int_form("width", 80, 8, 1024)
     height = _int_form("height", 80, 8, 1024)
@@ -93,9 +111,6 @@ def _convert_request_image() -> tuple[Image.Image, str, int, int, int]:
     crop_transparent = request.form.get("crop_transparent", "true") == "true"
     hard_alpha = request.form.get("hard_alpha", "true") == "true"
 
-    with Image.open(upload.stream) as opened:
-        source = opened.convert("RGBA")
-
     result = convert_pil_image(
         source,
         width=width,
@@ -107,7 +122,7 @@ def _convert_request_image() -> tuple[Image.Image, str, int, int, int]:
         crop_transparent=crop_transparent,
         hard_alpha=hard_alpha,
     )
-    return result, upload.filename, width, height, colors
+    return result, source_name, width, height, colors
 
 
 @app.get("/")
@@ -131,6 +146,26 @@ def choose_folder():
         return jsonify({"cancelled": False, "path": str(selected), "name": selected.name or str(selected)})
     except (RuntimeError, subprocess.TimeoutExpired) as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+@app.post("/api/source-preview")
+def source_preview():
+    try:
+        source, _source_name = _read_uploaded_rgba()
+        alpha_threshold = _int_form("alpha_threshold", 8, 0, 254)
+        crop_transparent = request.form.get("crop_transparent", "true") == "true"
+
+        if crop_transparent:
+            source = _crop_visible_source(source, alpha_threshold)
+
+        buffer = io.BytesIO()
+        source.save(buffer, format="PNG", optimize=False)
+        buffer.seek(0)
+        response = send_file(buffer, mimetype="image/png", as_attachment=False)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    except (ValueError, UnidentifiedImageError) as exc:
+        return jsonify({"error": str(exc)}), 400
 
 
 @app.post("/api/preview")
