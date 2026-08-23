@@ -15,7 +15,7 @@ reference image
     ↓
 drag into the local app
     ↓
-automatically infer/remove edge-connected background when possible
+automatically infer/remove the outer background when possible
     ↓
 choose canvas size and resize method
     ↓
@@ -38,7 +38,8 @@ The converter is intended as a preparation tool, not a replacement for manual pi
 
 - Local image processing; source images are not sent to an external service.
 - Drag-and-drop browser interface.
-- Automatic edge-connected background transparency for opaque source images when a background can be inferred.
+- Automatic outer-background transparency for opaque source images when a background can be inferred.
+- Foreground protection that blocks narrow background-colored paths from tunneling into dense interior details.
 - Existing transparent backgrounds and margins are preserved rather than cropped.
 - Linked source and converted-output comparison views.
 - Matched visual scale for direct before-and-after inspection.
@@ -97,7 +98,7 @@ http://127.0.0.1:8765
 ## Using the App
 
 1. Drag an image into the source area, or click the source area to choose a file.
-2. If the source has an opaque background, the app attempts to infer a dominant border/background color and make the connected outer background transparent.
+2. If the source has an opaque background, the app attempts to infer a dominant border/background color and make the confirmed outer background transparent.
 3. Set the target canvas size.
 4. Leave **Resize method** on **Nearest — Recommended** for normal pixel sampling, or try **Detail Preserve — complex art** for unusually dense references.
 5. Leave **Color handling** on **Preserve resized colors** when you want to retain the resized image's full color detail.
@@ -113,11 +114,13 @@ A destination folder is selected for each conversion. Previewing does not save a
 
 ### Automatic background transparency
 
-For opaque inputs, the converter estimates the dominant color along the outer border, identifies nearby colors within a conservative tolerance, and removes only matching areas that are connected to the outside edge. This helps protect dark holes, recesses, shadows, and other enclosed details inside the model.
+For opaque inputs, the converter estimates the dominant color along the outer border and identifies nearby colors within a conservative tolerance. Before determining which candidate pixels belong to the exterior, it temporarily shrinks the candidate background mask. This closes narrow dark seams and tiny gaps through a complex object so the outside flood cannot tunnel into interior recesses. The confirmed exterior is then expanded only a small distance and only through pixels that were already background candidates.
+
+This protection is especially important for dense machine art containing dark engravings, gaps between mechanical parts, recessed chambers, and other regions that may resemble the surrounding background.
 
 If the source already has meaningful transparency around its border, the converter trusts the existing alpha channel instead of trying to infer another background.
 
-This is intentionally conservative. Highly textured, photographic, multi-color, or object-touching backgrounds may still need manual cleanup in Aseprite.
+Background inference remains intentionally conservative. Highly textured, photographic, multi-color, or object-touching backgrounds may still need manual cleanup in Aseprite.
 
 ### Generated filenames
 
@@ -154,7 +157,7 @@ For detailed references, `128 × 128` with **Preserve resized colors** and **Nea
 ## Resize Methods
 
 - **Nearest** — recommended default; preserves hard pixel sampling without interpolation.
-- **Detail Preserve** — new dense-reference mode; performs high-quality Lanczos reduction and then controlled local sharpening to retain more visual separation in intricate inputs.
+- **Detail Preserve** — dense-reference mode; performs high-quality Lanczos reduction and then controlled local sharpening to retain more visual separation in intricate inputs.
 - **Lanczos** — detailed interpolation during strong downscaling.
 - **Bicubic** — balanced interpolation with a slightly softer result.
 - **Hamming** — useful for a somewhat sharper interpolated reduction.
