@@ -44,7 +44,7 @@ The converter is intended as a preparation tool, not a replacement for manual pi
 - Live converted-output preview before saving.
 - Preserve resized RGB colors by default for stronger detail retention.
 - Optional palette limiting from 2 to 256 colors.
-- Lanczos, Bicubic, Hamming, Box, and Nearest Neighbor resize methods.
+- Nearest, Lanczos, Bicubic, Hamming, and Box resize methods.
 - Native folder chooser for explicit output selection.
 - Configurable output width and height.
 - Transparent-background preservation.
@@ -97,14 +97,15 @@ http://127.0.0.1:8765
 
 1. Drag an image into the source area, or click the source area to choose a file.
 2. Set the target canvas size.
-3. Choose a resize method. Lanczos is the default for retaining detail while reducing a large reference.
-4. Leave **Color handling** on **Preserve resized colors** for maximum retained color detail, or choose **Limit palette** for deliberate palette reduction.
-5. Compare the **Source Image** and **Output Preview** at the same visual scale.
-6. Use the **−** and **+** controls to zoom both views together.
-7. Click and drag either preview to pan; the other preview follows the same position.
-8. Choose a destination folder with **Choose Folder…**.
-9. Click **Convert Image** to save the displayed result.
-10. Open the resulting PNG in Aseprite for final refinement.
+3. Leave **Resize method** on **Nearest — Recommended**, or compare another method in the live preview.
+4. Leave **Color handling** on **Preserve resized colors** when you want to retain the resized image's full color detail.
+5. To reduce colors deliberately, choose **Limit palette**. The visible **Palette colors** field becomes active; `32` is only a starting value and can be changed from `2` to `256`.
+6. Compare the **Source Image** and **Output Preview** at the same visual scale.
+7. Use the **−** and **+** controls to zoom both views together.
+8. Click and drag either preview to pan; the other preview follows the same position.
+9. Choose a destination folder with **Choose Folder…**.
+10. Click **Convert Image** to save the displayed result.
+11. Open the resulting PNG in Aseprite for final refinement.
 
 A destination folder is selected for each conversion. Previewing does not save a file and does not require an output folder.
 
@@ -114,17 +115,17 @@ Canvas size and color handling solve different problems:
 
 - **Canvas size** controls how much spatial detail can survive the downscale. Small dimensions simplify shapes more aggressively.
 - **Preserve resized colors** keeps the RGB colors created by the resize operation instead of forcing them into a limited palette.
-- **Limit palette** intentionally merges colors and is useful when a smaller, more traditional pixel-art palette is desired.
+- **Limit palette** intentionally merges colors. When enabled, the **Palette colors** field controls the maximum palette size; `32` is a starting value, not a required setting.
 
-For detailed generated or painted references, `128 × 128` with **Preserve resized colors** and **Lanczos** is a practical starting point. Increase the canvas to `160 × 160` or higher when small interior shapes still disappear. Reduce the palette only when color simplification is part of the desired look.
+For detailed references, `128 × 128` with **Preserve resized colors** and **Nearest — Recommended** is the default starting point. Increase the canvas to `160 × 160` or higher when small interior shapes still disappear. Use palette limiting only when color simplification is part of the desired look.
 
 ## Resize Methods
 
-- **Lanczos** — default; prioritizes detail retention during strong downscaling.
+- **Nearest** — recommended default; preserves hard pixel sampling without interpolation.
+- **Lanczos** — detailed interpolation during strong downscaling.
 - **Bicubic** — balanced interpolation with a slightly softer result.
-- **Hamming** — useful for a somewhat sharper reduction.
+- **Hamming** — useful for a somewhat sharper interpolated reduction.
 - **Box** — simple area averaging.
-- **Nearest** — literal nearest-pixel sampling with no interpolation.
 
 The best method depends on the source. The linked preview makes it possible to compare them before saving.
 
@@ -140,7 +141,7 @@ The defaults are intended to work well for transparent sprite references.
 
 ## Command-Line Interface
 
-The underlying converter remains available directly. The default CLI path preserves resized colors:
+The underlying converter remains available directly. The default CLI path preserves resized colors and uses Nearest resizing:
 
 ```bash
 python3 aseprite_image_pixel_converter.py input.png output.png --size 128
