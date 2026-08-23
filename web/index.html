@@ -353,7 +353,7 @@
 
           <div class="control">
             <div class="label-row"><label for="outputName">File name</label></div>
-            <input id="outputName" type="text" value="converted-128x128.png" spellcheck="false">
+            <input id="outputName" type="text" value="converted-128x128-nearest-preserve.png" spellcheck="false">
           </div>
 
           <div class="control full-width">
@@ -456,8 +456,14 @@
     }
     function refreshSuggestedName() {
       const stem = selectedFile ? baseName(selectedFile.name) : 'converted';
-      const paletteSuffix = paletteIsLimited() ? `-${colorsInput.value}c` : '';
-      outputName.value = `${stem}-${widthInput.value}x${heightInput.value}${paletteSuffix}.png`;
+      const parts = [stem, `${widthInput.value}x${heightInput.value}`, resampleInput.value];
+      if (paletteIsLimited()) {
+        parts.push(`${colorsInput.value}c`);
+        if (ditherInput.value === 'floyd') parts.push('floyd');
+      } else {
+        parts.push('preserve');
+      }
+      outputName.value = `${parts.join('-')}.png`;
     }
     function buildConversionForm(includeOutputName = false) {
       const form = new FormData();
@@ -693,7 +699,15 @@
       refreshSuggestedName();
       if (paletteIsLimited()) scheduleOutputPreview();
     });
-    [resampleInput, ditherInput, hardAlpha].forEach(input => input.addEventListener('change', scheduleOutputPreview));
+    resampleInput.addEventListener('change', () => {
+      refreshSuggestedName();
+      scheduleOutputPreview();
+    });
+    ditherInput.addEventListener('change', () => {
+      refreshSuggestedName();
+      scheduleOutputPreview();
+    });
+    hardAlpha.addEventListener('change', scheduleOutputPreview);
     cropTransparent.addEventListener('change', () => {
       renderSourceComparison();
       scheduleOutputPreview();
