@@ -62,7 +62,7 @@
     }
 
     .page {
-      width: min(980px, calc(100% - 40px));
+      width: min(1120px, calc(100% - 40px));
       margin: 0 auto;
       padding: 52px 0 68px;
     }
@@ -72,8 +72,6 @@
     .subtitle { margin: 9px 0 0; color: var(--secondary); font-size: 16px; line-height: 1.45; }
 
     .app-card {
-      display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr);
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 18px;
@@ -81,13 +79,18 @@
       box-shadow: 0 14px 36px rgba(0,0,0,.07);
     }
 
-    .preview-pane,
-    .settings-pane { padding: 28px; }
+    .comparison-pane {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 24px;
+      padding: 28px;
+    }
 
-    .preview-pane { border-right: 1px solid var(--border); }
+    .compare-panel { min-width: 0; }
     .eyebrow { margin: 0; color: var(--secondary); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
 
     .preview-heading-row {
+      min-height: 32px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -118,11 +121,7 @@
     .preset:hover,
     .zoom-button:hover:not(:disabled) { border-color: var(--border-strong); }
 
-    .change-image-button {
-      min-height: 30px;
-      padding: 4px 9px;
-      font-size: 12px;
-    }
+    .change-image-button { min-height: 30px; padding: 4px 9px; font-size: 12px; }
 
     .zoom-button {
       width: 30px;
@@ -137,7 +136,7 @@
     .zoom-value { min-width: 48px; color: var(--secondary); font-size: 12px; text-align: center; }
 
     .compare-frame {
-      height: 360px;
+      height: 420px;
       border: 1px solid var(--border);
       border-radius: 14px;
       overflow: auto;
@@ -169,12 +168,7 @@
       place-items: center;
     }
 
-    .comparison-canvas {
-      display: none;
-      position: relative;
-      flex: none;
-    }
-
+    .comparison-canvas { display: none; position: relative; flex: none; }
     .compare-frame.has-image .comparison-canvas { display: block; }
 
     .comparison-canvas img {
@@ -188,10 +182,7 @@
     }
 
     #sourcePreview { image-rendering: auto; }
-    #outputPreview {
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-    }
+    #outputPreview { image-rendering: pixelated; image-rendering: crisp-edges; }
 
     .compare-frame.has-image .preview-empty { display: none; }
     .preview-empty {
@@ -214,9 +205,25 @@
     }
 
     .preview-state.error { color: var(--error); }
-    .output-preview-section { margin-top: 28px; }
 
-    .control { margin-bottom: 20px; }
+    .settings-pane {
+      padding: 28px;
+      border-top: 1px solid var(--border);
+    }
+
+    .settings-title { margin-bottom: 20px; }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 20px 24px;
+    }
+
+    .control { min-width: 0; }
+    .control.full-width,
+    details,
+    .action { grid-column: 1 / -1; }
+
     .label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
     label { font-size: 13px; font-weight: 600; }
     .hint { color: var(--secondary); font-size: 11px; }
@@ -246,13 +253,14 @@
 
     .folder-path { margin-top: 8px; color: var(--secondary); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
 
-    details { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 22px; }
+    details { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 2px; }
     summary { color: var(--secondary); cursor: pointer; font-size: 12px; }
     .advanced { padding-top: 15px; }
+    .advanced .control { margin-bottom: 16px; }
     .check-row { display: flex; gap: 9px; align-items: center; margin: 12px 0; font-size: 12px; font-weight: 400; }
     .check-row input { width: 16px; height: 16px; accent-color: var(--blue); }
 
-    .action { border-top: 1px solid var(--border); margin-top: 23px; padding-top: 20px; }
+    .action { border-top: 1px solid var(--border); padding-top: 20px; }
 
     .primary {
       width: 100%;
@@ -274,9 +282,12 @@
 
     @media (max-width: 760px) {
       .page { width: min(100% - 24px, 620px); padding-top: 28px; }
-      .app-card { grid-template-columns: 1fr; }
-      .preview-pane { border-right: 0; border-bottom: 1px solid var(--border); }
-      .compare-frame { height: 320px; }
+      .comparison-pane,
+      .settings-grid { grid-template-columns: 1fr; }
+      .compare-frame { height: 340px; }
+      .control.full-width,
+      details,
+      .action { grid-column: auto; }
     }
   </style>
 </head>
@@ -288,31 +299,33 @@
     </header>
 
     <section class="app-card" aria-label="Image converter">
-      <div class="preview-pane">
-        <div class="preview-heading-row">
-          <p class="eyebrow">SOURCE IMAGE</p>
-          <div class="source-actions">
-            <button id="changeImageButton" class="secondary-button change-image-button" type="button" hidden>Change Image…</button>
-          </div>
-        </div>
-
-        <div id="sourceFrame" class="compare-frame" tabindex="0" aria-label="Source image comparison view">
-          <div class="compare-stage">
-            <div id="sourceCanvas" class="comparison-canvas">
-              <img id="sourcePreview" alt="Source image comparison preview" draggable="false">
-            </div>
-            <div class="preview-empty">
-              <strong>Drop an image here</strong><br>
-              or click to choose a PNG, JPEG, or WebP file
-            </div>
-          </div>
-        </div>
-        <div id="fileMeta" class="meta">No image selected</div>
-        <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
-
-        <div class="output-preview-section">
+      <div class="comparison-pane">
+        <section class="compare-panel" aria-labelledby="sourceHeading">
           <div class="preview-heading-row">
-            <p class="eyebrow">OUTPUT PREVIEW</p>
+            <p id="sourceHeading" class="eyebrow">SOURCE IMAGE</p>
+            <div class="source-actions">
+              <button id="changeImageButton" class="secondary-button change-image-button" type="button" hidden>Change Image…</button>
+            </div>
+          </div>
+
+          <div id="sourceFrame" class="compare-frame" tabindex="0" aria-label="Source image comparison view">
+            <div class="compare-stage">
+              <div id="sourceCanvas" class="comparison-canvas">
+                <img id="sourcePreview" alt="Source image comparison preview" draggable="false">
+              </div>
+              <div class="preview-empty">
+                <strong>Drop an image here</strong><br>
+                or click to choose a PNG, JPEG, or WebP file
+              </div>
+            </div>
+          </div>
+          <div id="fileMeta" class="meta">No image selected</div>
+          <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+        </section>
+
+        <section class="compare-panel" aria-labelledby="outputHeading">
+          <div class="preview-heading-row">
+            <p id="outputHeading" class="eyebrow">OUTPUT PREVIEW</p>
             <div class="zoom-controls" aria-label="Linked comparison zoom controls">
               <button id="zoomOutButton" class="zoom-button" type="button" aria-label="Zoom out" disabled>−</button>
               <span id="zoomValue" class="zoom-value">100%</span>
@@ -329,71 +342,73 @@
             </div>
           </div>
           <div id="previewState" class="preview-state"></div>
-        </div>
+        </section>
       </div>
 
       <div class="settings-pane">
-        <p class="eyebrow" style="margin-bottom: 18px;">OUTPUT</p>
+        <p class="eyebrow settings-title">OUTPUT SETTINGS</p>
 
-        <div class="control">
-          <div class="label-row"><label for="width">Canvas size</label><span class="hint">pixels</span></div>
-          <div class="size-row">
-            <input id="width" type="number" min="8" max="1024" value="80" aria-label="Output width">
-            <span class="times">×</span>
-            <input id="height" type="number" min="8" max="1024" value="80" aria-label="Output height">
-          </div>
-          <div class="presets">
-            <button class="preset" type="button" data-size="64">64</button>
-            <button class="preset" type="button" data-size="80">80</button>
-            <button class="preset" type="button" data-size="96">96</button>
-          </div>
-        </div>
-
-        <div class="control">
-          <div class="label-row"><label for="colors">Palette colors</label><span class="hint">2–256</span></div>
-          <input id="colors" type="number" min="2" max="256" value="16">
-        </div>
-
-        <div class="control">
-          <div class="label-row"><label for="resample">Resize method</label></div>
-          <select id="resample">
-            <option value="box" selected>Box — recommended for large references</option>
-            <option value="nearest">Nearest — most literal</option>
-            <option value="lanczos">Lanczos — smoother sampling</option>
-          </select>
-        </div>
-
-        <div class="control">
-          <div class="label-row"><label for="outputName">File name</label></div>
-          <input id="outputName" type="text" value="converted-80x80-16c.png" spellcheck="false">
-        </div>
-
-        <div class="control">
-          <div class="label-row"><label>Save location</label></div>
-          <div class="folder-box">
-            <button id="folderButton" class="secondary-button" type="button">Choose Folder…</button>
-            <div id="folderPath" class="folder-path">Choose a folder for this conversion.</div>
-          </div>
-        </div>
-
-        <details>
-          <summary>Advanced options</summary>
-          <div class="advanced">
-            <div class="control">
-              <div class="label-row"><label for="dither">Dithering</label></div>
-              <select id="dither">
-                <option value="none" selected>None</option>
-                <option value="floyd">Floyd–Steinberg</option>
-              </select>
+        <div class="settings-grid">
+          <div class="control">
+            <div class="label-row"><label for="width">Canvas size</label><span class="hint">pixels</span></div>
+            <div class="size-row">
+              <input id="width" type="number" min="8" max="1024" value="80" aria-label="Output width">
+              <span class="times">×</span>
+              <input id="height" type="number" min="8" max="1024" value="80" aria-label="Output height">
             </div>
-            <label class="check-row"><input id="cropTransparent" type="checkbox" checked>Crop transparent margins before resizing</label>
-            <label class="check-row"><input id="hardAlpha" type="checkbox" checked>Use hard transparent/opaque edges</label>
+            <div class="presets">
+              <button class="preset" type="button" data-size="64">64</button>
+              <button class="preset" type="button" data-size="80">80</button>
+              <button class="preset" type="button" data-size="96">96</button>
+            </div>
           </div>
-        </details>
 
-        <div class="action">
-          <button id="convertButton" class="primary" type="button" disabled>Convert Image</button>
-          <div id="status" class="status" aria-live="polite">Choose an image and output folder to begin.</div>
+          <div class="control">
+            <div class="label-row"><label for="colors">Palette colors</label><span class="hint">2–256</span></div>
+            <input id="colors" type="number" min="2" max="256" value="16">
+          </div>
+
+          <div class="control">
+            <div class="label-row"><label for="resample">Resize method</label></div>
+            <select id="resample">
+              <option value="box" selected>Box — recommended for large references</option>
+              <option value="nearest">Nearest — most literal</option>
+              <option value="lanczos">Lanczos — smoother sampling</option>
+            </select>
+          </div>
+
+          <div class="control">
+            <div class="label-row"><label for="outputName">File name</label></div>
+            <input id="outputName" type="text" value="converted-80x80-16c.png" spellcheck="false">
+          </div>
+
+          <div class="control full-width">
+            <div class="label-row"><label>Save location</label></div>
+            <div class="folder-box">
+              <button id="folderButton" class="secondary-button" type="button">Choose Folder…</button>
+              <div id="folderPath" class="folder-path">Choose a folder for this conversion.</div>
+            </div>
+          </div>
+
+          <details>
+            <summary>Advanced options</summary>
+            <div class="advanced">
+              <div class="control">
+                <div class="label-row"><label for="dither">Dithering</label></div>
+                <select id="dither">
+                  <option value="none" selected>None</option>
+                  <option value="floyd">Floyd–Steinberg</option>
+                </select>
+              </div>
+              <label class="check-row"><input id="cropTransparent" type="checkbox" checked>Crop transparent margins before resizing</label>
+              <label class="check-row"><input id="hardAlpha" type="checkbox" checked>Use hard transparent/opaque edges</label>
+            </div>
+          </details>
+
+          <div class="action">
+            <button id="convertButton" class="primary" type="button" disabled>Convert Image</button>
+            <div id="status" class="status" aria-live="polite">Choose an image and output folder to begin.</div>
+          </div>
         </div>
       </div>
     </section>
