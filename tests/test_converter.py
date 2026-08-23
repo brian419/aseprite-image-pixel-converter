@@ -71,7 +71,7 @@ class ConverterTests(unittest.TestCase):
             bbox = result.getchannel("A").getbbox()
             self.assertEqual(bbox, (0, 20, 80, 60))
 
-    def test_transparent_margins_are_cropped_by_default(self) -> None:
+    def test_transparent_margins_are_preserved_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
             source_path = temp / "margin.png"
@@ -87,7 +87,16 @@ class ConverterTests(unittest.TestCase):
 
             result = Image.open(output_path).convert("RGBA")
             bbox = result.getchannel("A").getbbox()
-            self.assertEqual(bbox, (26, 0, 53, 80))
+            self.assertEqual(bbox, (32, 16, 48, 64))
+
+    def test_explicit_crop_is_still_supported_in_core(self) -> None:
+        image = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+        for x in range(40, 60):
+            for y in range(20, 80):
+                image.putpixel((x, y), (40, 80, 120, 255))
+
+        result = convert_pil_image(image, width=80, height=80, crop_transparent=True)
+        self.assertEqual(result.getchannel("A").getbbox(), (26, 0, 53, 80))
 
     def test_additional_resize_filters_are_supported(self) -> None:
         source = Image.new("RGBA", (64, 64), (120, 80, 40, 255))
