@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import logging
 import re
 import subprocess
 import threading
@@ -9,10 +10,13 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, send_file
 from PIL import Image, UnidentifiedImageError
+from waitress import serve
 
 from aseprite_image_pixel_converter import convert_pil_image
 
-APP_URL = "http://127.0.0.1:8765"
+APP_HOST = "127.0.0.1"
+APP_PORT = 8765
+APP_URL = f"http://{APP_HOST}:{APP_PORT}"
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 app = Flask(__name__, static_folder="web", static_url_path="")
@@ -47,8 +51,8 @@ def _safe_output_name(requested: str, source_name: str, width: int, height: int,
     return f"{_safe_stem(source_name)}-{width}x{height}-{colors}c.png"
 
 
-def _choose_native_folder() -> Path | None:
-    script = 'POSIX path of (choose folder with prompt "Choose where converted images should be saved")'
+def _choose_output_folder() -> Path | None:
+    script = 'POSIX path of (choose folder with prompt "Choose where the converted image should be saved")'
     completed = subprocess.run(
         ["osascript", "-e", script],
         capture_output=True,
@@ -60,7 +64,7 @@ def _choose_native_folder() -> Path | None:
         path = Path(completed.stdout.strip()).expanduser()
         if path.is_dir():
             return path.resolve()
-        raise RuntimeError("The folder chooser returned an invalid folder.")
+        raise RuntimeError("The selected folder is invalid.")
 
     error_text = completed.stderr.strip()
     if "User canceled" in error_text or "(-128)" in error_text:
@@ -82,7 +86,7 @@ def health():
 def choose_folder():
     global _selected_output_directory
     try:
-        selected = _choose_native_folder()
+        selected = _choose_output_folder()
         if selected is None:
             return jsonify({"cancelled": True})
         _selected_output_directory = selected
@@ -91,18 +95,15 @@ def choose_folder():
         return jsonify({"error": str(exc)}), 500
 
 
-@app.post("/api/clear-folder")
-def clear_folder():
-    global _selected_output_directory
-    _selected_output_directory = None
-    return jsonify({"ok": True})
-
-
 @app.post("/api/convert")
 def convert():
+    global _selected_output_directory
+
     upload = request.files.get("image")
     if upload is None or not upload.filename:
         return jsonify({"error": "Choose an image first."}), 400
+    if _selected_output_directory is None:
+        return jsonify({"error": "Choose an output folder before converting."}), 400
 
     try:
         width = _int_form("width", 80, 8, 1024)
@@ -144,28 +145,16 @@ def convert():
             colors,
         )
 
-        save_to_folder = request.form.get("save_to_folder", "false") == "true"
-        if save_to_folder and _selected_output_directory is not None:
-            output_path = _selected_output_directory / output_name
-            result.save(output_path, format="PNG", optimize=False)
-            return jsonify({
-                "saved": True,
-                "filename": output_name,
-                "path": str(output_path),
-                "folder": str(_selected_output_directory),
-            })
+        output_directory = _selected_output_directory
+        output_path = output_directory / output_name
+        result.save(output_path, format="PNG", optimize=False)
+        _selected_output_directory = None
 
-        buffer = io.BytesIO()
-        result.save(buffer, format="PNG", optimize=False)
-        buffer.seek(0)
-        response = send_file(
-            buffer,
-            mimetype="image/png",
-            as_attachment=True,
-            download_name=output_name,
-        )
-        response.headers["X-Output-Filename"] = output_name
-        return response
+        return jsonify({
+            "saved": True,
+            "filename": output_name,
+            "path": str(output_path),
+        })
 
     except (ValueError, UnidentifiedImageError) as exc:
         return jsonify({"error": str(exc)}), 400
@@ -181,7 +170,8 @@ def _open_browser() -> None:
 
 
 if __name__ == "__main__":
+    logging.getLogger("waitress").setLevel(logging.ERROR)
     threading.Timer(0.7, _open_browser).start()
     print(f"Aseprite Image Pixel Converter is running at {APP_URL}")
     print("Keep this Terminal window open while you use the app. Press Control-C to stop it.")
-    app.run(host="127.0.0.1", port=8765, debug=False, use_reloader=False)
+    serve(app, host=APP_HOST, port=APP_PORT, threads=4)
