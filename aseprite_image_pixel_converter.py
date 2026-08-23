@@ -108,12 +108,53 @@ def _dominant_edge_color(source: Image.Image) -> tuple[tuple[int, int, int], int
     return (background[0], background[1], background[2]), tolerance
 
 
+def _edge_connected_background_mask(candidates: Image.Image) -> Image.Image:
+    """Return a protected edge-connected subset of a candidate background mask.
+
+    Candidate background is first eroded before flood filling. This deliberately
+    closes narrow background-colored passages through a dense foreground object,
+    preventing the flood from tunneling into dark recesses or tiny mechanical gaps.
+    The confirmed exterior is then expanded only a few pixels and only inside the
+    original candidate mask, recovering a clean outer edge without reopening those
+    narrow passages.
+    """
+
+    width, height = candidates.size
+    minimum_side = min(width, height)
+    guard_radius = max(1, min(3, minimum_side // 256))
+    guard_size = guard_radius * 2 + 1
+
+    protected_core = candidates.filter(ImageFilter.MinFilter(guard_size))
+    flood = protected_core.copy()
+    pixels = flood.load()
+
+    for x in range(width):
+        if pixels[x, 0] == 255:
+            ImageDraw.floodfill(flood, (x, 0), 128)
+        if pixels[x, height - 1] == 255:
+            ImageDraw.floodfill(flood, (x, height - 1), 128)
+    for y in range(height):
+        if pixels[0, y] == 255:
+            ImageDraw.floodfill(flood, (0, y), 128)
+        if pixels[width - 1, y] == 255:
+            ImageDraw.floodfill(flood, (width - 1, y), 128)
+
+    confirmed = flood.point(lambda value: 255 if value == 128 else 0)
+    for _ in range(guard_radius):
+        expanded = confirmed.filter(ImageFilter.MaxFilter(3))
+        confirmed = ImageChops.multiply(expanded, candidates)
+
+    return confirmed
+
+
 def auto_remove_background(source: Image.Image) -> Image.Image:
-    """Make an inferred edge-connected background transparent when possible.
+    """Make an inferred outer background transparent when it can be removed safely.
 
     Existing transparent borders are preserved as-is. For opaque images, the
-    dominant border color is estimated and only similar pixels connected to an
-    outer edge are removed. Enclosed dark details therefore remain intact.
+    dominant border color is estimated. Similar pixels are treated as background
+    candidates, but a small foreground-protection barrier is applied before the
+    outer flood fill so narrow dark seams and recesses inside complex models are
+    much less likely to become accidental transparency.
     """
 
     source = source.convert("RGBA")
@@ -133,21 +174,8 @@ def auto_remove_background(source: Image.Image) -> Image.Image:
         blue_diff,
     )
     candidates = max_diff.point(lambda value: 255 if value <= tolerance else 0)
+    removed_background = _edge_connected_background_mask(candidates)
 
-    width, height = candidates.size
-    candidate_pixels = candidates.load()
-    for x in range(width):
-        if candidate_pixels[x, 0] == 255:
-            ImageDraw.floodfill(candidates, (x, 0), 128)
-        if candidate_pixels[x, height - 1] == 255:
-            ImageDraw.floodfill(candidates, (x, height - 1), 128)
-    for y in range(height):
-        if candidate_pixels[0, y] == 255:
-            ImageDraw.floodfill(candidates, (0, y), 128)
-        if candidate_pixels[width - 1, y] == 255:
-            ImageDraw.floodfill(candidates, (width - 1, y), 128)
-
-    removed_background = candidates.point(lambda value: 255 if value == 128 else 0)
     alpha = ImageChops.subtract(source.getchannel("A"), removed_background)
     result = source.copy()
     result.putalpha(alpha)
@@ -186,7 +214,7 @@ def convert_pil_image(
 ) -> Image.Image:
     """Return a resized RGBA image suitable for inspection and refinement in Aseprite.
 
-    The converter attempts to make an inferred opaque background transparent.
+    The converter attempts to make an inferred opaque outer background transparent.
     Transparent margins are otherwise preserved by default. RGB colors produced
     by resizing are preserved unless ``colors`` is provided to intentionally
     limit the palette.
@@ -321,7 +349,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--keep-background",
         action="store_true",
-        help="Skip automatic edge-connected background transparency.",
+        help="Skip automatic outer-background transparency.",
     )
     parser.add_argument(
         "--crop",
