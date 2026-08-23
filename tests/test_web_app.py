@@ -33,19 +33,32 @@ class WebAppTests(unittest.TestCase):
         source_bytes.seek(0)
         return source_bytes
 
-    def _conversion_data(self, *, color_mode: str = "preserve") -> dict[str, object]:
+    def _conversion_data(
+        self,
+        *,
+        color_mode: str = "preserve",
+        dither: str = "none",
+        output_name: str | None = None,
+    ) -> dict[str, object]:
+        if output_name is None:
+            if color_mode == "preserve":
+                output_name = "artifact-128x128-nearest-preserve.png"
+            else:
+                dither_suffix = "-floyd" if dither == "floyd" else ""
+                output_name = f"artifact-128x128-nearest-32c{dither_suffix}.png"
+
         return {
             "image": (self._image_bytes(), "artifact.png"),
             "width": "128",
             "height": "128",
             "color_mode": color_mode,
             "colors": "32",
-            "resample": "lanczos",
-            "dither": "none",
+            "resample": "nearest",
+            "dither": dither,
             "crop_transparent": "true",
             "hard_alpha": "true",
             "alpha_threshold": "8",
-            "output_name": "artifact-128x128.png" if color_mode == "preserve" else "artifact-128x128-32c.png",
+            "output_name": output_name,
         }
 
     def test_health_endpoint(self) -> None:
@@ -130,7 +143,7 @@ class WebAppTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             data = response.get_json()
             self.assertTrue(data["saved"])
-            self.assertEqual(data["filename"], "artifact-128x128.png")
+            self.assertEqual(data["filename"], "artifact-128x128-nearest-preserve.png")
 
             output_path = Path(data["path"])
             self.assertTrue(output_path.exists())
@@ -138,6 +151,26 @@ class WebAppTests(unittest.TestCase):
                 self.assertEqual(result.size, (128, 128))
 
             self.assertIsNone(web_app._selected_output_directory)
+
+    def test_generated_fallback_filename_describes_palette_and_dither(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            web_app._selected_output_directory = Path(temp_dir)
+            response = self.client.post(
+                "/api/convert",
+                data=self._conversion_data(
+                    color_mode="limit",
+                    dither="floyd",
+                    output_name="",
+                ),
+                content_type="multipart/form-data",
+            )
+
+            self.assertEqual(response.status_code, 200)
+            data = response.get_json()
+            self.assertEqual(
+                data["filename"],
+                "artifact-128x128-nearest-32c-floyd.png",
+            )
 
 
 if __name__ == "__main__":
