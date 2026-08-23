@@ -41,9 +41,8 @@ def _fit_size(source: tuple[int, int], target: tuple[int, int]) -> tuple[int, in
     return max(1, round(source_w * scale)), max(1, round(source_h * scale))
 
 
-def convert_image(
-    input_path: str | Path,
-    output_path: str | Path,
+def convert_pil_image(
+    source: Image.Image,
     *,
     width: int = 80,
     height: int = 80,
@@ -53,21 +52,20 @@ def convert_image(
     dither: DitherName = "none",
     crop_transparent: bool = True,
     hard_alpha: bool = True,
-) -> Path:
-    """Convert an image into a small, palette-limited RGBA PNG."""
+) -> Image.Image:
+    """Return a small, palette-limited RGBA image suitable for Aseprite cleanup."""
     if width < 1 or height < 1:
         raise ValueError("width and height must both be at least 1.")
     if not 2 <= colors <= 256:
         raise ValueError("colors must be between 2 and 256.")
     if not 0 <= alpha_threshold <= 254:
         raise ValueError("alpha_threshold must be between 0 and 254.")
+    if resample not in {"nearest", "box", "lanczos"}:
+        raise ValueError("Unknown resize method.")
+    if dither not in {"none", "floyd"}:
+        raise ValueError("Unknown dithering mode.")
 
-    input_path = Path(input_path)
-    output_path = Path(output_path)
-
-    with Image.open(input_path) as opened:
-        source = opened.convert("RGBA")
-
+    source = source.convert("RGBA")
     working = source.crop(_visible_bbox(source, alpha_threshold)) if crop_transparent else source
 
     fitted_size = _fit_size(working.size, (width, height))
@@ -92,9 +90,41 @@ def convert_image(
     x = (width - quantized.width) // 2
     y = (height - quantized.height) // 2
     canvas.alpha_composite(quantized, (x, y))
+    return canvas
+
+
+def convert_image(
+    input_path: str | Path,
+    output_path: str | Path,
+    *,
+    width: int = 80,
+    height: int = 80,
+    colors: int = 16,
+    alpha_threshold: int = 8,
+    resample: ResampleName = "nearest",
+    dither: DitherName = "none",
+    crop_transparent: bool = True,
+    hard_alpha: bool = True,
+) -> Path:
+    """Convert a file on disk and save the resulting PNG."""
+    input_path = Path(input_path)
+    output_path = Path(output_path)
+
+    with Image.open(input_path) as opened:
+        result = convert_pil_image(
+            opened,
+            width=width,
+            height=height,
+            colors=colors,
+            alpha_threshold=alpha_threshold,
+            resample=resample,
+            dither=dither,
+            crop_transparent=crop_transparent,
+            hard_alpha=hard_alpha,
+        )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    canvas.save(output_path, format="PNG", optimize=False)
+    result.save(output_path, format="PNG", optimize=False)
     return output_path
 
 
