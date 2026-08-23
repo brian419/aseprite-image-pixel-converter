@@ -1,131 +1,98 @@
 # Aseprite Image Pixel Converter
 
-A small local Python utility for converting large PNG/reference images into smaller, palette-limited PNGs that are easier to refine manually in Aseprite.
+A local macOS-friendly utility for turning large reference images into smaller, palette-limited PNGs that are easier to refine manually in Aseprite.
 
-The intended workflow is:
+The primary experience is a local browser app:
 
 ```text
-large reference PNG
+drag in an image
         ↓
-crop transparent margins
+choose canvas size and palette
         ↓
-resize to a small canvas
+choose an output folder
         ↓
-reduce to a controlled palette
+click Convert Image
         ↓
-harden transparency
-        ↓
-Aseprite-ready PNG for manual cleanup
+open the result in Aseprite
 ```
 
-This tool does **not** attempt to create finished pixel art automatically. It prepares a constrained starting image so the final outlines, clusters, details, palette, and artistic decisions can be refined in Aseprite.
+The converter runs on your own Mac. It does not upload source images to an external service.
 
-## Current features
+## Easiest way to run it
 
-- Runs completely locally.
-- Default output is `80 × 80`.
-- Default palette limit is 16 colors.
-- Preserves transparent backgrounds.
-- Crops transparent margins by default.
-- Preserves aspect ratio and centers the sprite.
-- Hardens alpha to fully transparent/opaque pixels by default.
-- Supports Nearest Neighbor, Box, and Lanczos downscaling.
-- Optional Floyd–Steinberg dithering.
-- Supports non-square output sizes.
-- Includes unit tests.
+After pulling the latest `development` branch, open the repository in Finder and double-click:
+
+```text
+start.command
+```
+
+The launcher will:
+
+1. create a local `.venv` if needed,
+2. install/update the small Python dependencies if they are missing,
+3. start the local converter,
+4. open the app in your default browser.
+
+Keep the Terminal window opened by `start.command` running while you use the app. Close it or press Control-C when you are finished.
+
+The local app runs at:
+
+```text
+http://127.0.0.1:8765
+```
+
+## GUI features
+
+- Drag-and-drop image input.
+- Click-to-browse image input.
+- Source preview.
+- Simple 64, 80, and 96 pixel presets.
+- Custom width and height.
+- Configurable palette size.
+- Resize method selector.
+- Editable output filename.
+- Folder picker in supported Chromium browsers such as Brave.
+- Standard browser download fallback if a folder is not selected.
+- Advanced transparency and dithering controls kept out of the main workflow.
+- Light and dark appearance using native system preferences.
+- Uses the macOS system font stack and restrained, platform-oriented UI styling.
+
+## Default conversion behavior
+
+The GUI starts with:
+
+- `80 × 80` output.
+- 16 visible RGB colors maximum.
+- Box resampling, which is often a useful starting point for very large reference images.
+- Transparent margins cropped before resize.
+- Hard transparent/opaque output edges.
+- No dithering.
+
+The goal is not automatic finished pixel art. The output is a smaller, controlled starting image for manual Aseprite cleanup.
 
 ## Requirements
 
-- Python 3.10+
+- macOS or another system with Python 3.10+
+- Flask
 - Pillow
 
-## Setup on macOS
+`start.command` handles the virtual environment and package installation for normal use.
 
-From the repository folder on `development`:
+## Terminal launch, if needed
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install --upgrade pip
-python3 -m pip install -r requirements.txt
-```
-
-Whenever you open a new Terminal later, reactivate the environment with:
+You can also start the GUI manually:
 
 ```bash
 source .venv/bin/activate
+python3 web_app.py
 ```
 
-## Basic conversion
+## Command-line converter
+
+The original CLI remains available for advanced or scripted use:
 
 ```bash
 python3 aseprite_image_pixel_converter.py input.png output.png --size 80 --colors 16
-```
-
-Example using files in Downloads:
-
-```bash
-python3 aseprite_image_pixel_converter.py \
-  ~/Downloads/machine.png \
-  ~/Downloads/machine-80x80.png \
-  --size 80 \
-  --colors 16
-```
-
-Then open the output PNG in Aseprite and clean/refine it manually.
-
-## Compare resizing methods
-
-Nearest Neighbor is the default:
-
-```bash
-python3 aseprite_image_pixel_converter.py input.png nearest.png --size 80 --colors 16 --resample nearest
-```
-
-For very large generated/reference images, `box` can sometimes preserve the overall silhouette better:
-
-```bash
-python3 aseprite_image_pixel_converter.py input.png box.png --size 80 --colors 16 --resample box
-```
-
-Lanczos retains more averaged shape information before palette reduction:
-
-```bash
-python3 aseprite_image_pixel_converter.py input.png lanczos.png --size 80 --colors 16 --resample lanczos
-```
-
-Compare the results in Aseprite rather than assuming one method is always best.
-
-## Other options
-
-Different square size:
-
-```bash
-python3 aseprite_image_pixel_converter.py input.png output.png --size 64 --colors 12
-```
-
-Rectangular output:
-
-```bash
-python3 aseprite_image_pixel_converter.py input.png output.png --width 64 --height 96 --colors 16
-```
-
-Enable dithering:
-
-```bash
-python3 aseprite_image_pixel_converter.py input.png output.png --dither floyd
-```
-
-Keep semi-transparent pixels:
-
-```bash
-python3 aseprite_image_pixel_converter.py input.png output.png --keep-soft-alpha
-```
-
-Keep original transparent margins:
-
-```bash
-python3 aseprite_image_pixel_converter.py input.png output.png --no-crop
 ```
 
 Show every CLI option:
@@ -137,6 +104,7 @@ python3 aseprite_image_pixel_converter.py --help
 ## Run tests
 
 ```bash
+source .venv/bin/activate
 python3 -m unittest discover -s tests -v
 ```
 
