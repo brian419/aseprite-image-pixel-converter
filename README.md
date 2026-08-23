@@ -1,28 +1,69 @@
 # Aseprite Image Pixel Converter
 
-A local macOS-friendly utility for converting large reference images into smaller, palette-limited PNGs that are easier to refine manually in Aseprite.
+A local macOS utility for converting large reference images into smaller, palette-limited PNGs for refinement in Aseprite.
 
-The primary workflow is now a local browser app:
+The project is designed for workflows where a source image has useful visual structure but is too large, too soft, or contains too many colors to edit comfortably as pixel art. The converter reduces the image to a controlled canvas and palette while preserving transparency and overall composition, producing a cleaner starting point for manual work in Aseprite.
+
+## Overview
+
+The primary interface is a local browser application backed by Python. Processing stays on the local machine.
+
+Typical workflow:
 
 ```text
-launch app
-  ↓
-drag in an image
-  ↓
-choose size and palette
-  ↓
-choose a macOS save folder (optional)
-  ↓
+reference image
+    ↓
+drag into the local app
+    ↓
+choose canvas size and palette limit
+    ↓
+choose an output folder
+    ↓
 convert
-  ↓
-open the result in Aseprite
+    ↓
+open and refine in Aseprite
 ```
 
-The tool runs locally. It does **not** attempt to create finished pixel art automatically; it prepares a constrained starting image for manual cleanup and art decisions in Aseprite.
+The converter is intended as a preparation tool, not a replacement for manual pixel-art decisions. Final silhouettes, clusters, outlines, animation, and artistic cleanup remain part of the Aseprite workflow.
 
-## Normal use on macOS
+## Features
 
-After pulling `development`, launch the app with:
+- Local image processing; source images are not sent to an external service.
+- Drag-and-drop browser interface.
+- Source-image preview.
+- Native macOS folder chooser for direct output.
+- Browser-download fallback when no folder is selected.
+- Configurable output width and height.
+- Configurable palette size from 2 to 256 colors.
+- Transparent-background preservation.
+- Optional cropping of transparent margins before resizing.
+- Aspect-ratio preservation and automatic centering.
+- Optional hard alpha for fully transparent or fully opaque edges.
+- Nearest Neighbor, Box, and Lanczos resize methods.
+- Optional Floyd–Steinberg dithering.
+- Command-line interface for advanced or scripted use.
+- Unit tests for the image converter and local web backend.
+
+## Requirements
+
+- macOS for the native folder-selection workflow
+- Python 3.10 or newer
+- Flask
+- Pillow
+
+Dependencies are installed automatically into a local virtual environment by the launcher on first use.
+
+## Getting Started
+
+Clone the repository and switch to the branch you want to use. For normal development, use `development`.
+
+```bash
+git clone https://github.com/brian419/aseprite-image-pixel-converter.git
+cd aseprite-image-pixel-converter
+git switch development
+```
+
+Launch the application:
 
 ```bash
 open start.command
@@ -30,72 +71,88 @@ open start.command
 
 You can also double-click `start.command` in Finder.
 
-On first launch, the script creates `.venv` and installs the required local Python packages. Later launches reuse that environment.
+On first launch, the script creates `.venv`, installs the required dependencies, starts the local server, and opens the application in the default browser.
 
-The browser interface opens at:
+The interface is served locally at:
 
 ```text
 http://127.0.0.1:8765
 ```
 
-### In the app
+## Using the App
 
-1. Drag an image into the source area, or click the area to choose one.
-2. Pick a canvas size such as 64, 80, or 96 pixels.
-3. Pick the palette color limit.
-4. Click **Choose Folder…** to open the native macOS folder chooser if you want the PNG written directly to a specific folder.
-5. Click **Convert Image**.
+1. Drag an image into the source area, or click the source area to choose a file.
+2. Set the target canvas size.
+3. Set the palette color limit.
+4. Choose a resize method.
+5. Optionally choose a destination folder with **Choose Folder…**.
+6. Click **Convert Image**.
+7. Open the resulting PNG in Aseprite for final refinement.
 
-If no folder is selected, the converted PNG downloads through the browser normally.
+If no output folder is selected, the converted image is downloaded through the browser.
 
-## Current features
+### Choosing settings
 
-- Local-only processing.
-- Drag-and-drop source images.
-- Native macOS folder chooser for output.
-- Normal browser-download fallback.
-- Source-image preview.
-- Default output of `80 × 80` and 16 colors.
-- Preserves transparent backgrounds.
-- Crops transparent margins by default.
-- Preserves aspect ratio and centers the sprite.
-- Hardens alpha to fully transparent/opaque pixels by default.
-- Nearest, Box, and Lanczos resize methods.
-- Optional Floyd–Steinberg dithering.
-- Command-line converter remains available for advanced use.
-- Unit tests for converter and web backend.
+Smaller canvases and smaller palettes simplify the image more aggressively. Higher values retain more information from detailed source images.
 
-## Requirements
+A practical starting range for detailed generated or painted references is:
 
-- macOS for the native save-folder picker
-- Python 3.10+
-- Flask
-- Pillow
+- `96–128 px` with `16–32 colors` for stronger simplification.
+- `128–192 px` with `32–64 colors` when more source detail should be retained.
 
-## Tests
+The appropriate settings depend on the source image and the desired final pixel-art scale.
 
-With the virtual environment active:
+## Advanced Options
 
-```bash
-python3 -m unittest discover -s tests -v
-```
+The interface also exposes:
 
-## Advanced command-line use
+- **Dithering** — optional Floyd–Steinberg color dithering.
+- **Crop transparent margins** — removes unused transparent space before resizing.
+- **Hard transparent/opaque edges** — converts alpha to fully transparent or fully opaque pixels.
 
-The underlying converter can still be run directly:
+The defaults are intended to work well for most transparent sprite references.
+
+## Command-Line Interface
+
+The underlying converter remains available directly:
 
 ```bash
 python3 aseprite_image_pixel_converter.py input.png output.png --size 80 --colors 16
 ```
 
-Show every option with:
+View all options:
 
 ```bash
 python3 aseprite_image_pixel_converter.py --help
 ```
 
-## Branch policy
+## Tests
 
-- `main` is the stable backup branch and is not changed during normal development.
+With the project virtual environment active:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+## Project Structure
+
+```text
+aseprite-image-pixel-converter/
+├── aseprite_image_pixel_converter.py   # image conversion logic and CLI
+├── web_app.py                          # local Flask backend
+├── web/
+│   └── index.html                      # browser interface
+├── tests/                              # automated tests
+├── requirements.txt                    # Python dependencies
+└── start.command                       # macOS launcher
+```
+
+## Branch Policy
+
+- `main` is the stable branch and is updated deliberately after verification.
 - `development` is the normal integration branch.
-- Temporary feature/fix branches should be created only when useful and removed after approved integration.
+- Temporary feature and fix branches should be created only when needed and removed after approved integration.
+
+## License
+
+No license has been added yet. Until a license is explicitly provided, the repository remains under the default copyright protections of its owner.
