@@ -114,7 +114,6 @@
       border-radius: 11px;
       background: var(--surface-soft);
     }
-    .folder-actions { display: flex; gap: 8px; }
     .folder-path { margin-top: 8px; color: var(--secondary); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
 
     details { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 22px; }
@@ -203,11 +202,8 @@
         <div class="control">
           <div class="label-row"><label>Save location</label></div>
           <div class="folder-box">
-            <div class="folder-actions">
-              <button id="folderButton" class="secondary-button" type="button">Choose Folder…</button>
-              <button id="clearFolderButton" class="secondary-button" type="button" hidden>Use Downloads</button>
-            </div>
-            <div id="folderPath" class="folder-path">No folder selected. Converted images will download normally.</div>
+            <button id="folderButton" class="secondary-button" type="button">Choose Folder…</button>
+            <div id="folderPath" class="folder-path">Choose a folder for this conversion.</div>
           </div>
         </div>
 
@@ -228,12 +224,12 @@
 
         <div class="action">
           <button id="convertButton" class="primary" type="button" disabled>Convert Image</button>
-          <div id="status" class="status" aria-live="polite">Choose an image to begin.</div>
+          <div id="status" class="status" aria-live="polite">Choose an image and output folder to begin.</div>
         </div>
       </div>
     </section>
 
-    <p class="privacy">The interface is served from localhost. Images are processed by the local converter and are not sent to an external service.</p>
+    <p class="privacy">The interface is served from localhost. Images are processed locally and are not sent to an external service.</p>
   </main>
 
   <script>
@@ -250,7 +246,6 @@
     const cropTransparent = document.getElementById('cropTransparent');
     const hardAlpha = document.getElementById('hardAlpha');
     const folderButton = document.getElementById('folderButton');
-    const clearFolderButton = document.getElementById('clearFolderButton');
     const folderPath = document.getElementById('folderPath');
     const convertButton = document.getElementById('convertButton');
     const status = document.getElementById('status');
@@ -262,6 +257,10 @@
     function setStatus(message, kind = '') {
       status.textContent = message;
       status.className = `status ${kind}`.trim();
+    }
+
+    function updateConvertState() {
+      convertButton.disabled = !(selectedFile && hasOutputFolder);
     }
 
     function baseName(name) {
@@ -285,9 +284,9 @@
       preview.src = previewUrl;
       dropZone.classList.add('has-image');
       fileMeta.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
-      convertButton.disabled = false;
       refreshSuggestedName();
-      setStatus('Ready to convert.');
+      updateConvertState();
+      setStatus(hasOutputFolder ? 'Ready to convert.' : 'Choose an output folder.');
     }
 
     dropZone.addEventListener('click', () => fileInput.click());
@@ -323,14 +322,14 @@
         const response = await fetch('/api/choose-folder', { method: 'POST' });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Could not choose a folder.');
-        if (!data.cancelled) {
-          hasOutputFolder = true;
-          folderPath.textContent = data.path;
-          clearFolderButton.hidden = false;
-          setStatus('Output folder selected.');
-        } else {
-          setStatus(selectedFile ? 'Ready to convert.' : 'Choose an image to begin.');
+        if (data.cancelled) {
+          setStatus(selectedFile ? 'Choose an output folder.' : 'Choose an image and output folder to begin.');
+          return;
         }
+        hasOutputFolder = true;
+        folderPath.textContent = data.path;
+        updateConvertState();
+        setStatus(selectedFile ? 'Ready to convert.' : 'Choose an image.');
       } catch (error) {
         setStatus(error.message, 'error');
       } finally {
@@ -338,16 +337,8 @@
       }
     });
 
-    clearFolderButton.addEventListener('click', async () => {
-      await fetch('/api/clear-folder', { method: 'POST' });
-      hasOutputFolder = false;
-      folderPath.textContent = 'No folder selected. Converted images will download normally.';
-      clearFolderButton.hidden = true;
-      setStatus(selectedFile ? 'Ready to convert.' : 'Choose an image to begin.');
-    });
-
     convertButton.addEventListener('click', async () => {
-      if (!selectedFile) return;
+      if (!selectedFile || !hasOutputFolder) return;
 
       convertButton.disabled = true;
       setStatus('Converting…');
@@ -363,36 +354,19 @@
       form.append('hard_alpha', String(hardAlpha.checked));
       form.append('alpha_threshold', '8');
       form.append('output_name', outputName.value);
-      form.append('save_to_folder', String(hasOutputFolder));
 
       try {
         const response = await fetch('/api/convert', { method: 'POST', body: form });
-        const contentType = response.headers.get('content-type') || '';
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Conversion failed.');
 
-        if (!response.ok) {
-          const data = contentType.includes('application/json') ? await response.json() : {};
-          throw new Error(data.error || 'Conversion failed.');
-        }
-
-        if (contentType.includes('application/json')) {
-          const data = await response.json();
-          setStatus(`Saved ${data.filename}`, 'success');
-        } else {
-          const blob = await response.blob();
-          const downloadUrl = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = downloadUrl;
-          link.download = response.headers.get('X-Output-Filename') || outputName.value || 'converted.png';
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          URL.revokeObjectURL(downloadUrl);
-          setStatus('Converted image downloaded.', 'success');
-        }
+        hasOutputFolder = false;
+        folderPath.textContent = 'Choose a folder for the next conversion.';
+        updateConvertState();
+        setStatus(`Saved ${data.filename}`, 'success');
       } catch (error) {
+        updateConvertState();
         setStatus(error.message, 'error');
-      } finally {
-        convertButton.disabled = false;
       }
     });
   </script>
