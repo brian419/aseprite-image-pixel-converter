@@ -147,7 +147,7 @@
   <main class="page">
     <header>
       <h1>Aseprite Image Pixel Converter</h1>
-      <p class="subtitle">Turn a large reference image into a smaller, palette-limited PNG for cleanup in Aseprite. Everything stays on this Mac.</p>
+      <p class="subtitle">Convert large reference images into smaller, palette-limited PNGs for cleanup and refinement in Aseprite.</p>
     </header>
 
     <section class="app-card" aria-label="Image converter">
@@ -233,7 +233,7 @@
       </div>
     </section>
 
-    <p class="privacy">The page is served from localhost. Images are processed by the converter running on this Mac and are not sent to an external service.</p>
+    <p class="privacy">The interface is served from localhost. Images are processed by the local converter and are not sent to an external service.</p>
   </main>
 
   <script>
@@ -318,19 +318,19 @@
 
     folderButton.addEventListener('click', async () => {
       folderButton.disabled = true;
-      setStatus('Opening the macOS folder chooser…');
+      setStatus('Opening folder chooser…');
       try {
         const response = await fetch('/api/choose-folder', { method: 'POST' });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Could not choose a folder.');
-        if (data.cancelled) {
-          setStatus('Folder selection cancelled.');
-          return;
+        if (!data.cancelled) {
+          hasOutputFolder = true;
+          folderPath.textContent = data.path;
+          clearFolderButton.hidden = false;
+          setStatus('Output folder selected.');
+        } else {
+          setStatus(selectedFile ? 'Ready to convert.' : 'Choose an image to begin.');
         }
-        hasOutputFolder = true;
-        folderPath.textContent = data.path;
-        clearFolderButton.hidden = false;
-        setStatus('Save folder selected.');
       } catch (error) {
         setStatus(error.message, 'error');
       } finally {
@@ -343,11 +343,12 @@
       hasOutputFolder = false;
       folderPath.textContent = 'No folder selected. Converted images will download normally.';
       clearFolderButton.hidden = true;
-      setStatus('Using normal browser downloads.');
+      setStatus(selectedFile ? 'Ready to convert.' : 'Choose an image to begin.');
     });
 
     convertButton.addEventListener('click', async () => {
       if (!selectedFile) return;
+
       convertButton.disabled = true;
       setStatus('Converting…');
 
@@ -375,19 +376,18 @@
 
         if (contentType.includes('application/json')) {
           const data = await response.json();
-          setStatus(`Saved ${data.filename} to ${data.folder}`, 'success');
+          setStatus(`Saved ${data.filename}`, 'success');
         } else {
           const blob = await response.blob();
-          const filename = response.headers.get('X-Output-Filename') || outputName.value || 'converted.png';
-          const url = URL.createObjectURL(blob);
-          const anchor = document.createElement('a');
-          anchor.href = url;
-          anchor.download = filename;
-          document.body.appendChild(anchor);
-          anchor.click();
-          anchor.remove();
-          URL.revokeObjectURL(url);
-          setStatus(`Downloaded ${filename}`, 'success');
+          const downloadUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.download = response.headers.get('X-Output-Filename') || outputName.value || 'converted.png';
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(downloadUrl);
+          setStatus('Converted image downloaded.', 'success');
         }
       } catch (error) {
         setStatus(error.message, 'error');
