@@ -119,6 +119,27 @@ class ConverterTests(unittest.TestCase):
         self.assertEqual(result.getpixel((20, 20))[3], 255)
         self.assertEqual(result.getpixel((40, 40))[3], 255)
 
+    def test_auto_background_removal_blocks_narrow_tunnels_into_foreground(self) -> None:
+        image = Image.new("RGBA", (80, 80), (12, 12, 12, 255))
+        for x in range(10, 70):
+            for y in range(10, 70):
+                image.putpixel((x, y), (175, 115, 45, 255))
+
+        # An enclosed dark recess is connected to the outer background by a
+        # deliberately narrow two-pixel seam. The protection barrier should
+        # keep that seam from turning the whole recess transparent.
+        for x in range(30, 50):
+            for y in range(30, 50):
+                image.putpixel((x, y), (12, 12, 12, 255))
+        for x in range(39, 41):
+            for y in range(0, 31):
+                image.putpixel((x, y), (12, 12, 12, 255))
+
+        result = auto_remove_background(image)
+        self.assertEqual(result.getpixel((0, 0))[3], 0)
+        self.assertEqual(result.getpixel((40, 40))[3], 255)
+        self.assertEqual(result.getpixel((20, 20))[3], 255)
+
     def test_existing_transparent_border_is_left_intact(self) -> None:
         image = Image.new("RGBA", (40, 40), (0, 0, 0, 0))
         for x in range(10, 30):
