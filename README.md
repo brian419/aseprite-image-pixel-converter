@@ -58,12 +58,11 @@ Dependencies are installed automatically into a local virtual environment by the
 
 ## Getting Started
 
-Clone the repository and switch to the branch you want to use. For normal development, use `development`.
+Clone the repository:
 
 ```bash
 git clone https://github.com/brian419/aseprite-image-pixel-converter.git
 cd aseprite-image-pixel-converter
-git switch development
 ```
 
 Launch the application:
@@ -149,13 +148,3 @@ aseprite-image-pixel-converter/
 ├── requirements.txt                    # Python dependencies
 └── start.command                       # local launcher
 ```
-
-## Branch Policy
-
-- `main` is the stable branch and is updated deliberately after verification.
-- `development` is the normal integration branch.
-- Temporary feature and fix branches should be created only when needed and removed after approved integration.
-
-## License
-
-No license has been added yet. Until a license is explicitly provided, the repository remains under the default copyright protections of its owner.
