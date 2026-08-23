@@ -72,6 +72,44 @@ def _choose_output_folder() -> Path | None:
     raise RuntimeError(error_text or "Could not open the folder chooser.")
 
 
+def _convert_request_image() -> tuple[Image.Image, str, int, int, int]:
+    upload = request.files.get("image")
+    if upload is None or not upload.filename:
+        raise ValueError("Choose an image first.")
+
+    width = _int_form("width", 80, 8, 1024)
+    height = _int_form("height", 80, 8, 1024)
+    colors = _int_form("colors", 16, 2, 256)
+    alpha_threshold = _int_form("alpha_threshold", 8, 0, 254)
+
+    resample = request.form.get("resample", "box")
+    if resample not in {"nearest", "box", "lanczos"}:
+        raise ValueError("Unknown resize method.")
+
+    dither = request.form.get("dither", "none")
+    if dither not in {"none", "floyd"}:
+        raise ValueError("Unknown dithering mode.")
+
+    crop_transparent = request.form.get("crop_transparent", "true") == "true"
+    hard_alpha = request.form.get("hard_alpha", "true") == "true"
+
+    with Image.open(upload.stream) as opened:
+        source = opened.convert("RGBA")
+
+    result = convert_pil_image(
+        source,
+        width=width,
+        height=height,
+        colors=colors,
+        alpha_threshold=alpha_threshold,
+        resample=resample,
+        dither=dither,
+        crop_transparent=crop_transparent,
+        hard_alpha=hard_alpha,
+    )
+    return result, upload.filename, width, height, colors
+
+
 @app.get("/")
 def index():
     return app.send_static_file("index.html")
@@ -95,51 +133,32 @@ def choose_folder():
         return jsonify({"error": str(exc)}), 500
 
 
+@app.post("/api/preview")
+def preview():
+    try:
+        result, _source_name, _width, _height, _colors = _convert_request_image()
+        buffer = io.BytesIO()
+        result.save(buffer, format="PNG", optimize=False)
+        buffer.seek(0)
+        response = send_file(buffer, mimetype="image/png", as_attachment=False)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    except (ValueError, UnidentifiedImageError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
 @app.post("/api/convert")
 def convert():
     global _selected_output_directory
 
-    upload = request.files.get("image")
-    if upload is None or not upload.filename:
-        return jsonify({"error": "Choose an image first."}), 400
     if _selected_output_directory is None:
         return jsonify({"error": "Choose an output folder before converting."}), 400
 
     try:
-        width = _int_form("width", 80, 8, 1024)
-        height = _int_form("height", 80, 8, 1024)
-        colors = _int_form("colors", 16, 2, 256)
-        alpha_threshold = _int_form("alpha_threshold", 8, 0, 254)
-
-        resample = request.form.get("resample", "box")
-        if resample not in {"nearest", "box", "lanczos"}:
-            raise ValueError("Unknown resize method.")
-
-        dither = request.form.get("dither", "none")
-        if dither not in {"none", "floyd"}:
-            raise ValueError("Unknown dithering mode.")
-
-        crop_transparent = request.form.get("crop_transparent", "true") == "true"
-        hard_alpha = request.form.get("hard_alpha", "true") == "true"
-
-        with Image.open(upload.stream) as opened:
-            source = opened.convert("RGBA")
-
-        result = convert_pil_image(
-            source,
-            width=width,
-            height=height,
-            colors=colors,
-            alpha_threshold=alpha_threshold,
-            resample=resample,
-            dither=dither,
-            crop_transparent=crop_transparent,
-            hard_alpha=hard_alpha,
-        )
-
+        result, source_name, width, height, colors = _convert_request_image()
         output_name = _safe_output_name(
             request.form.get("output_name", ""),
-            upload.filename,
+            source_name,
             width,
             height,
             colors,
