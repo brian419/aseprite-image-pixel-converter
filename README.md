@@ -1,111 +1,97 @@
 # Aseprite Image Pixel Converter
 
-A local macOS-friendly utility for turning large reference images into smaller, palette-limited PNGs that are easier to refine manually in Aseprite.
+A local macOS-friendly utility for converting large reference images into smaller, palette-limited PNGs that are easier to refine manually in Aseprite.
 
-The primary experience is a local browser app:
+The primary workflow is now a local browser app:
 
 ```text
+launch app
+  ↓
 drag in an image
-        ↓
-choose canvas size and palette
-        ↓
-choose an output folder
-        ↓
-click Convert Image
-        ↓
+  ↓
+choose size and palette
+  ↓
+choose a macOS save folder (optional)
+  ↓
+convert
+  ↓
 open the result in Aseprite
 ```
 
-The converter runs on your own Mac. It does not upload source images to an external service.
+The tool runs locally. It does **not** attempt to create finished pixel art automatically; it prepares a constrained starting image for manual cleanup and art decisions in Aseprite.
 
-## Easiest way to run it
+## Normal use on macOS
 
-After pulling the latest `development` branch, open the repository in Finder and double-click:
+After pulling `development`, launch the app with:
 
-```text
-start.command
+```bash
+open start.command
 ```
 
-The launcher will:
+You can also double-click `start.command` in Finder.
 
-1. create a local `.venv` if needed,
-2. install/update the small Python dependencies if they are missing,
-3. start the local converter,
-4. open the app in your default browser.
+On first launch, the script creates `.venv` and installs the required local Python packages. Later launches reuse that environment.
 
-Keep the Terminal window opened by `start.command` running while you use the app. Close it or press Control-C when you are finished.
-
-The local app runs at:
+The browser interface opens at:
 
 ```text
 http://127.0.0.1:8765
 ```
 
-## GUI features
+### In the app
 
-- Drag-and-drop image input.
-- Click-to-browse image input.
-- Source preview.
-- Simple 64, 80, and 96 pixel presets.
-- Custom width and height.
-- Configurable palette size.
-- Resize method selector.
-- Editable output filename.
-- Folder picker in supported Chromium browsers such as Brave.
-- Standard browser download fallback if a folder is not selected.
-- Advanced transparency and dithering controls kept out of the main workflow.
-- Light and dark appearance using native system preferences.
-- Uses the macOS system font stack and restrained, platform-oriented UI styling.
+1. Drag an image into the source area, or click the area to choose one.
+2. Pick a canvas size such as 64, 80, or 96 pixels.
+3. Pick the palette color limit.
+4. Click **Choose Folder…** to open the native macOS folder chooser if you want the PNG written directly to a specific folder.
+5. Click **Convert Image**.
 
-## Default conversion behavior
+If no folder is selected, the converted PNG downloads through the browser normally.
 
-The GUI starts with:
+## Current features
 
-- `80 × 80` output.
-- 16 visible RGB colors maximum.
-- Box resampling, which is often a useful starting point for very large reference images.
-- Transparent margins cropped before resize.
-- Hard transparent/opaque output edges.
-- No dithering.
-
-The goal is not automatic finished pixel art. The output is a smaller, controlled starting image for manual Aseprite cleanup.
+- Local-only processing.
+- Drag-and-drop source images.
+- Native macOS folder chooser for output.
+- Normal browser-download fallback.
+- Source-image preview.
+- Default output of `80 × 80` and 16 colors.
+- Preserves transparent backgrounds.
+- Crops transparent margins by default.
+- Preserves aspect ratio and centers the sprite.
+- Hardens alpha to fully transparent/opaque pixels by default.
+- Nearest, Box, and Lanczos resize methods.
+- Optional Floyd–Steinberg dithering.
+- Command-line converter remains available for advanced use.
+- Unit tests for converter and web backend.
 
 ## Requirements
 
-- macOS or another system with Python 3.10+
+- macOS for the native save-folder picker
+- Python 3.10+
 - Flask
 - Pillow
 
-`start.command` handles the virtual environment and package installation for normal use.
+## Tests
 
-## Terminal launch, if needed
-
-You can also start the GUI manually:
+With the virtual environment active:
 
 ```bash
-source .venv/bin/activate
-python3 web_app.py
+python3 -m unittest discover -s tests -v
 ```
 
-## Command-line converter
+## Advanced command-line use
 
-The original CLI remains available for advanced or scripted use:
+The underlying converter can still be run directly:
 
 ```bash
 python3 aseprite_image_pixel_converter.py input.png output.png --size 80 --colors 16
 ```
 
-Show every CLI option:
+Show every option with:
 
 ```bash
 python3 aseprite_image_pixel_converter.py --help
-```
-
-## Run tests
-
-```bash
-source .venv/bin/activate
-python3 -m unittest discover -s tests -v
 ```
 
 ## Branch policy
