@@ -17,7 +17,7 @@ drag into the local app
     ↓
 choose canvas size and palette limit
     ↓
-inspect the live converted preview
+inspect and zoom the live converted preview
     ↓
 choose an output folder
     ↓
@@ -35,6 +35,7 @@ The converter is intended as a preparation tool, not a replacement for manual pi
 - Source-image preview.
 - Live converted-output preview before saving.
 - Automatic preview refresh when conversion settings change.
+- Crisp preview zoom controls for inspecting small pixel-art outputs.
 - Native folder chooser for explicit output selection.
 - Configurable output width and height.
 - Configurable palette size from 2 to 256 colors.
@@ -91,9 +92,10 @@ http://127.0.0.1:8765
 2. Set the target canvas size.
 3. Set the palette color limit and resize method.
 4. Inspect the **Output Preview**. It refreshes automatically when conversion settings change.
-5. Choose a destination folder with **Choose Folder…**.
-6. Click **Convert Image** to save the displayed result.
-7. Open the resulting PNG in Aseprite for final refinement.
+5. Use the **−** and **+** controls to zoom the preview without changing the saved image.
+6. Choose a destination folder with **Choose Folder…**.
+7. Click **Convert Image** to save the displayed result.
+8. Open the resulting PNG in Aseprite for final refinement.
 
 A destination folder is selected for each conversion. Previewing does not save a file and does not require an output folder.
 
