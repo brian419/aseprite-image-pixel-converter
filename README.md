@@ -48,11 +48,8 @@ The converter is intended as a preparation tool, not a replacement for manual pi
 - Descriptive filenames generated from the selected conversion settings.
 - Native folder chooser for explicit output selection.
 - Configurable output width and height.
-- Transparent-background preservation.
-- Optional cropping of transparent margins before resizing.
+- Transparent-background preservation and automatic edge cleanup.
 - Aspect-ratio preservation and automatic centering.
-- Optional hard alpha for fully transparent or fully opaque edges.
-- Optional Floyd–Steinberg dithering when palette limiting is enabled.
 - Command-line interface for advanced or scripted use.
 - Unit tests for the image converter and local web backend.
 
@@ -124,12 +121,6 @@ Palette-limited files include the palette size:
 source-128x128-nearest-32c.png
 ```
 
-When Floyd–Steinberg dithering is enabled, the filename also records it:
-
-```text
-source-128x128-nearest-32c-floyd.png
-```
-
 The filename remains editable before saving.
 
 ### Choosing settings
@@ -151,16 +142,6 @@ For detailed references, `128 × 128` with **Preserve resized colors** and **Nea
 - **Box** — simple area averaging.
 
 The best method depends on the source. The linked preview makes it possible to compare them before saving.
-
-## Advanced Options
-
-The interface also exposes:
-
-- **Dithering** — optional Floyd–Steinberg dithering when **Limit palette** is enabled.
-- **Crop transparent margins** — removes unused transparent space before resizing.
-- **Hard transparent/opaque edges** — converts alpha to fully transparent or fully opaque pixels.
-
-The defaults are intended to work well for transparent sprite references.
 
 ## Command-Line Interface
 
