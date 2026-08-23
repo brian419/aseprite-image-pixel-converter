@@ -55,8 +55,6 @@ class WebAppTests(unittest.TestCase):
             "colors": "32",
             "resample": "nearest",
             "dither": dither,
-            "crop_transparent": "true",
-            "hard_alpha": "true",
             "alpha_threshold": "8",
             "output_name": output_name,
         }
@@ -66,12 +64,11 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {"ok": True})
 
-    def test_source_preview_returns_cropped_high_resolution_png(self) -> None:
+    def test_source_preview_preserves_original_transparent_margins(self) -> None:
         response = self.client.post(
             "/api/source-preview",
             data={
                 "image": (self._image_bytes(), "artifact.png"),
-                "crop_transparent": "true",
                 "alpha_threshold": "8",
             },
             content_type="multipart/form-data",
@@ -82,7 +79,7 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(response.headers["Cache-Control"], "no-store")
 
         with Image.open(io.BytesIO(response.data)) as result:
-            self.assertEqual(result.size, (80, 60))
+            self.assertEqual(result.size, (120, 80))
 
     def test_preview_preserves_resized_colors_by_default(self) -> None:
         response = self.client.post(
