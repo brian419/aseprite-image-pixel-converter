@@ -50,7 +50,7 @@ def convert_pil_image(
     height: int = 128,
     colors: int | None = None,
     alpha_threshold: int = 8,
-    resample: ResampleName = "lanczos",
+    resample: ResampleName = "nearest",
     dither: DitherName = "none",
     crop_transparent: bool = True,
     hard_alpha: bool = True,
@@ -110,7 +110,7 @@ def convert_image(
     height: int = 128,
     colors: int | None = None,
     alpha_threshold: int = 8,
-    resample: ResampleName = "lanczos",
+    resample: ResampleName = "nearest",
     dither: DitherName = "none",
     crop_transparent: bool = True,
     hard_alpha: bool = True,
@@ -158,8 +158,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--resample",
         choices=("nearest", "box", "hamming", "bicubic", "lanczos"),
-        default="lanczos",
-        help="Downscaling filter. Default: lanczos.",
+        default="nearest",
+        help="Downscaling filter. Default: nearest (recommended).",
     )
     parser.add_argument(
         "--dither",
