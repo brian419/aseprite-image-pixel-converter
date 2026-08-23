@@ -17,7 +17,9 @@ drag into the local app
     ↓
 choose canvas size and palette limit
     ↓
-inspect and zoom the live converted preview
+compare the linked source and converted views
+    ↓
+zoom and pan the same area in both views
     ↓
 choose an output folder
     ↓
@@ -32,10 +34,12 @@ The converter is intended as a preparation tool, not a replacement for manual pi
 
 - Local image processing; source images are not sent to an external service.
 - Drag-and-drop browser interface.
-- Source-image preview.
+- Linked source and converted-output comparison views.
+- Matched visual scale for direct before-and-after inspection.
+- Synchronized zoom and pan between source and output views.
+- Smooth source rendering beside crisp pixelated output rendering.
 - Live converted-output preview before saving.
 - Automatic preview refresh when conversion settings change.
-- Crisp preview zoom controls for inspecting small pixel-art outputs.
 - Native folder chooser for explicit output selection.
 - Configurable output width and height.
 - Configurable palette size from 2 to 256 colors.
@@ -91,11 +95,12 @@ http://127.0.0.1:8765
 1. Drag an image into the source area, or click the source area to choose a file.
 2. Set the target canvas size.
 3. Set the palette color limit and resize method.
-4. Inspect the **Output Preview**. It refreshes automatically when conversion settings change.
-5. Use the **−** and **+** controls to zoom the preview without changing the saved image.
-6. Choose a destination folder with **Choose Folder…**.
-7. Click **Convert Image** to save the displayed result.
-8. Open the resulting PNG in Aseprite for final refinement.
+4. Compare the **Source Image** and **Output Preview** at the same visual scale.
+5. Use the **−** and **+** controls to zoom both views together.
+6. Click and drag either preview to pan; the other preview follows the same position.
+7. Choose a destination folder with **Choose Folder…**.
+8. Click **Convert Image** to save the displayed result.
+9. Open the resulting PNG in Aseprite for final refinement.
 
 A destination folder is selected for each conversion. Previewing does not save a file and does not require an output folder.
 
