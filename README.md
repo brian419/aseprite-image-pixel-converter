@@ -45,6 +45,7 @@ The converter is intended as a preparation tool, not a replacement for manual pi
 - Preserve resized RGB colors by default for stronger detail retention.
 - Optional palette limiting from 2 to 256 colors.
 - Nearest, Lanczos, Bicubic, Hamming, and Box resize methods.
+- Descriptive filenames generated from the selected conversion settings.
 - Native folder chooser for explicit output selection.
 - Configurable output width and height.
 - Transparent-background preservation.
@@ -108,6 +109,28 @@ http://127.0.0.1:8765
 11. Open the resulting PNG in Aseprite for final refinement.
 
 A destination folder is selected for each conversion. Previewing does not save a file and does not require an output folder.
+
+### Generated filenames
+
+The suggested filename updates automatically when the main conversion settings change. The default preserve-colors format is:
+
+```text
+source-128x128-nearest-preserve.png
+```
+
+Palette-limited files include the palette size:
+
+```text
+source-128x128-nearest-32c.png
+```
+
+When Floyd–Steinberg dithering is enabled, the filename also records it:
+
+```text
+source-128x128-nearest-32c-floyd.png
+```
+
+The filename remains editable before saving.
 
 ### Choosing settings
 
