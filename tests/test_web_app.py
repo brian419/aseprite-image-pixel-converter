@@ -30,10 +30,39 @@ class WebAppTests(unittest.TestCase):
         source_bytes.seek(0)
         return source_bytes
 
+    def _conversion_data(self) -> dict[str, object]:
+        return {
+            "image": (self._image_bytes(), "artifact.png"),
+            "width": "80",
+            "height": "80",
+            "colors": "16",
+            "resample": "box",
+            "dither": "none",
+            "crop_transparent": "true",
+            "hard_alpha": "true",
+            "alpha_threshold": "8",
+            "output_name": "artifact-80x80-16c.png",
+        }
+
     def test_health_endpoint(self) -> None:
         response = self.client.get("/api/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {"ok": True})
+
+    def test_preview_returns_converted_png_without_output_folder(self) -> None:
+        response = self.client.post(
+            "/api/preview",
+            data=self._conversion_data(),
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "image/png")
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertTrue(response.data.startswith(b"\x89PNG\r\n\x1a\n"))
+
+        with Image.open(io.BytesIO(response.data)) as result:
+            self.assertEqual(result.size, (80, 80))
 
     def test_convert_requires_output_folder(self) -> None:
         response = self.client.post(
@@ -51,18 +80,7 @@ class WebAppTests(unittest.TestCase):
 
             response = self.client.post(
                 "/api/convert",
-                data={
-                    "image": (self._image_bytes(), "artifact.png"),
-                    "width": "80",
-                    "height": "80",
-                    "colors": "16",
-                    "resample": "box",
-                    "dither": "none",
-                    "crop_transparent": "true",
-                    "hard_alpha": "true",
-                    "alpha_threshold": "8",
-                    "output_name": "artifact-80x80-16c.png",
-                },
+                data=self._conversion_data(),
                 content_type="multipart/form-data",
             )
 
