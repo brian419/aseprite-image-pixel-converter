@@ -4,9 +4,9 @@ import argparse
 from pathlib import Path
 from typing import Literal
 
-from PIL import Image
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
-ResampleName = Literal["nearest", "box", "hamming", "bicubic", "lanczos"]
+ResampleName = Literal["nearest", "box", "hamming", "bicubic", "lanczos", "detail"]
 DitherName = Literal["none", "floyd"]
 
 
@@ -43,6 +43,134 @@ def _fit_size(source: tuple[int, int], target: tuple[int, int]) -> tuple[int, in
     return max(1, round(source_w * scale)), max(1, round(source_h * scale))
 
 
+def _edge_coordinates(size: tuple[int, int]) -> list[tuple[int, int]]:
+    width, height = size
+    step = max(1, min(width, height) // 128)
+    coordinates: list[tuple[int, int]] = []
+    for x in range(0, width, step):
+        coordinates.append((x, 0))
+        coordinates.append((x, height - 1))
+    for y in range(0, height, step):
+        coordinates.append((0, y))
+        coordinates.append((width - 1, y))
+    coordinates.extend(
+        [(0, 0), (width - 1, 0), (0, height - 1), (width - 1, height - 1)]
+    )
+    return coordinates
+
+
+def _dominant_edge_color(source: Image.Image) -> tuple[tuple[int, int, int], int] | None:
+    rgba = source.convert("RGBA")
+    pixels = rgba.load()
+    coordinates = _edge_coordinates(rgba.size)
+    border_alphas = [pixels[x, y][3] for x, y in coordinates]
+
+    # If the border already contains meaningful transparency, trust the source alpha
+    # instead of trying to infer and remove another background.
+    transparent_samples = sum(alpha < 250 for alpha in border_alphas)
+    if transparent_samples >= max(1, len(border_alphas) // 20):
+        return None
+
+    samples = [
+        pixels[x, y][:3]
+        for x, y in coordinates
+        if pixels[x, y][3] >= 250
+    ]
+    if not samples:
+        return None
+
+    sample_image = Image.new("RGB", (len(samples), 1))
+    sample_image.putdata(samples)
+    quantized = sample_image.quantize(
+        colors=min(8, len(samples)),
+        method=Image.Quantize.MEDIANCUT,
+    )
+    counts = quantized.getcolors() or []
+    if not counts:
+        return None
+    dominant_index = max(counts, key=lambda item: item[0])[1]
+    palette = quantized.getpalette()
+    if palette is None:
+        return None
+    start = dominant_index * 3
+    background = tuple(palette[start : start + 3])
+
+    deviations = sorted(
+        max(
+            abs(red - background[0]),
+            abs(green - background[1]),
+            abs(blue - background[2]),
+        )
+        for red, green, blue in samples
+    )
+    percentile_index = min(len(deviations) - 1, int((len(deviations) - 1) * 0.90))
+    tolerance = max(18, min(48, deviations[percentile_index] + 12))
+    return (background[0], background[1], background[2]), tolerance
+
+
+def auto_remove_background(source: Image.Image) -> Image.Image:
+    """Make an inferred edge-connected background transparent when possible.
+
+    Existing transparent borders are preserved as-is. For opaque images, the
+    dominant border color is estimated and only similar pixels connected to an
+    outer edge are removed. Enclosed dark details therefore remain intact.
+    """
+
+    source = source.convert("RGBA")
+    inference = _dominant_edge_color(source)
+    if inference is None:
+        return source
+
+    background, tolerance = inference
+    rgb = source.convert("RGB")
+    difference = ImageChops.difference(
+        rgb,
+        Image.new("RGB", source.size, background),
+    )
+    red_diff, green_diff, blue_diff = difference.split()
+    max_diff = ImageChops.lighter(
+        ImageChops.lighter(red_diff, green_diff),
+        blue_diff,
+    )
+    candidates = max_diff.point(lambda value: 255 if value <= tolerance else 0)
+
+    width, height = candidates.size
+    candidate_pixels = candidates.load()
+    for x in range(width):
+        if candidate_pixels[x, 0] == 255:
+            ImageDraw.floodfill(candidates, (x, 0), 128)
+        if candidate_pixels[x, height - 1] == 255:
+            ImageDraw.floodfill(candidates, (x, height - 1), 128)
+    for y in range(height):
+        if candidate_pixels[0, y] == 255:
+            ImageDraw.floodfill(candidates, (0, y), 128)
+        if candidate_pixels[width - 1, y] == 255:
+            ImageDraw.floodfill(candidates, (width - 1, y), 128)
+
+    removed_background = candidates.point(lambda value: 255 if value == 128 else 0)
+    alpha = ImageChops.subtract(source.getchannel("A"), removed_background)
+    result = source.copy()
+    result.putalpha(alpha)
+    return result
+
+
+def _detail_preserving_resize(image: Image.Image, size: tuple[int, int]) -> Image.Image:
+    """Downscale dense references with high-quality resampling plus restrained sharpening."""
+
+    resized = image.resize(
+        size,
+        Image.Resampling.LANCZOS,
+        reducing_gap=3.0,
+    )
+    alpha = resized.getchannel("A")
+    sharpened_rgb = resized.convert("RGB").filter(
+        ImageFilter.UnsharpMask(radius=0.8, percent=175, threshold=2)
+    )
+    result = sharpened_rgb.convert("RGBA")
+    result.putalpha(alpha)
+    return result
+
+
 def convert_pil_image(
     source: Image.Image,
     *,
@@ -54,12 +182,14 @@ def convert_pil_image(
     dither: DitherName = "none",
     crop_transparent: bool = False,
     hard_alpha: bool = True,
+    remove_background: bool = True,
 ) -> Image.Image:
     """Return a resized RGBA image suitable for inspection and refinement in Aseprite.
 
-    Transparent margins are preserved by default. Pass ``crop_transparent=True``
-    only when an explicit crop is desired. RGB colors produced by resizing are
-    preserved unless ``colors`` is provided to intentionally limit the palette.
+    The converter attempts to make an inferred opaque background transparent.
+    Transparent margins are otherwise preserved by default. RGB colors produced
+    by resizing are preserved unless ``colors`` is provided to intentionally
+    limit the palette.
     """
     if width < 1 or height < 1:
         raise ValueError("width and height must both be at least 1.")
@@ -67,17 +197,23 @@ def convert_pil_image(
         raise ValueError("colors must be between 2 and 256 when palette limiting is enabled.")
     if not 0 <= alpha_threshold <= 254:
         raise ValueError("alpha_threshold must be between 0 and 254.")
-    if resample not in {"nearest", "box", "hamming", "bicubic", "lanczos"}:
+    if resample not in {"nearest", "box", "hamming", "bicubic", "lanczos", "detail"}:
         raise ValueError("Unknown resize method.")
     if dither not in {"none", "floyd"}:
         raise ValueError("Unknown dithering mode.")
 
     source = source.convert("RGBA")
+    if remove_background:
+        source = auto_remove_background(source)
+
     visible_bbox = _visible_bbox(source, alpha_threshold)
     working = source.crop(visible_bbox) if crop_transparent else source
 
     fitted_size = _fit_size(working.size, (width, height))
-    resized = working.resize(fitted_size, _resample_filter(resample))
+    if resample == "detail":
+        resized = _detail_preserving_resize(working, fitted_size)
+    else:
+        resized = working.resize(fitted_size, _resample_filter(resample))
 
     if hard_alpha:
         alpha = resized.getchannel("A").point(
@@ -116,6 +252,7 @@ def convert_image(
     dither: DitherName = "none",
     crop_transparent: bool = False,
     hard_alpha: bool = True,
+    remove_background: bool = True,
 ) -> Path:
     """Convert a file on disk and save the resulting PNG."""
     input_path = Path(input_path)
@@ -132,6 +269,7 @@ def convert_image(
             dither=dither,
             crop_transparent=crop_transparent,
             hard_alpha=hard_alpha,
+            remove_background=remove_background,
         )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -143,7 +281,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Resize reference images into crisp low-resolution PNGs for Aseprite, "
-            "with optional palette limiting."
+            "with automatic background transparency and optional palette limiting."
         )
     )
     parser.add_argument("input", help="Path to the source image.")
@@ -159,9 +297,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--resample",
-        choices=("nearest", "box", "hamming", "bicubic", "lanczos"),
+        choices=("nearest", "detail", "box", "hamming", "bicubic", "lanczos"),
         default="nearest",
-        help="Downscaling filter. Default: nearest (recommended).",
+        help="Downscaling method. Default: nearest (recommended).",
     )
     parser.add_argument(
         "--dither",
@@ -179,6 +317,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--keep-soft-alpha",
         action="store_true",
         help="Preserve semi-transparent pixels instead of hardening alpha to 0/255.",
+    )
+    parser.add_argument(
+        "--keep-background",
+        action="store_true",
+        help="Skip automatic edge-connected background transparency.",
     )
     parser.add_argument(
         "--crop",
@@ -204,6 +347,7 @@ def main() -> int:
         dither=args.dither,
         crop_transparent=args.crop,
         hard_alpha=not args.keep_soft_alpha,
+        remove_background=not args.keep_background,
     )
     color_note = "preserved resized colors" if args.colors is None else f"max {args.colors} visible RGB colors"
     print(f"Saved {output} ({width}x{height}, {color_note})")
