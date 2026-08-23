@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import re
+import subprocess
 import threading
 import webbrowser
 from pathlib import Path
@@ -16,6 +17,8 @@ MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 app = Flask(__name__, static_folder="web", static_url_path="")
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
+
+_selected_output_directory: Path | None = None
 
 
 def _int_form(name: str, default: int, minimum: int, maximum: int) -> int:
@@ -35,6 +38,36 @@ def _safe_stem(filename: str) -> str:
     return stem[:100] or "converted-image"
 
 
+def _safe_output_name(requested: str, source_name: str, width: int, height: int, colors: int) -> str:
+    requested = requested.strip()
+    if requested.lower().endswith(".png"):
+        name = Path(requested).name
+        stem = _safe_stem(name)
+        return f"{stem}.png" if not stem.lower().endswith(".png") else stem
+    return f"{_safe_stem(source_name)}-{width}x{height}-{colors}c.png"
+
+
+def _choose_macos_folder() -> Path | None:
+    script = 'POSIX path of (choose folder with prompt "Choose where converted images should be saved")'
+    completed = subprocess.run(
+        ["osascript", "-e", script],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    if completed.returncode == 0:
+        path = Path(completed.stdout.strip()).expanduser()
+        if path.is_dir():
+            return path.resolve()
+        raise RuntimeError("macOS returned an invalid folder.")
+
+    error_text = completed.stderr.strip()
+    if "User canceled" in error_text or "(-128)" in error_text:
+        return None
+    raise RuntimeError(error_text or "Could not open the macOS folder chooser.")
+
+
 @app.get("/")
 def index():
     return app.send_static_file("index.html")
@@ -42,6 +75,26 @@ def index():
 
 @app.get("/api/health")
 def health():
+    return jsonify({"ok": True})
+
+
+@app.post("/api/choose-folder")
+def choose_folder():
+    global _selected_output_directory
+    try:
+        selected = _choose_macos_folder()
+        if selected is None:
+            return jsonify({"cancelled": True})
+        _selected_output_directory = selected
+        return jsonify({"cancelled": False, "path": str(selected), "name": selected.name or str(selected)})
+    except (RuntimeError, subprocess.TimeoutExpired) as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.post("/api/clear-folder")
+def clear_folder():
+    global _selected_output_directory
+    _selected_output_directory = None
     return jsonify({"ok": True})
 
 
@@ -83,20 +136,32 @@ def convert():
             hard_alpha=hard_alpha,
         )
 
+        output_name = _safe_output_name(
+            request.form.get("output_name", ""),
+            upload.filename,
+            width,
+            height,
+            colors,
+        )
+
+        save_to_folder = request.form.get("save_to_folder", "false") == "true"
+        if save_to_folder and _selected_output_directory is not None:
+            output_path = _selected_output_directory / output_name
+            result.save(output_path, format="PNG", optimize=False)
+            return jsonify({
+                "saved": True,
+                "filename": output_name,
+                "path": str(output_path),
+                "folder": str(_selected_output_directory),
+            })
+
         buffer = io.BytesIO()
         result.save(buffer, format="PNG", optimize=False)
         buffer.seek(0)
-
-        output_name = request.form.get("output_name", "").strip()
-        if not output_name.lower().endswith(".png"):
-            output_name = f"{_safe_stem(upload.filename)}-{width}x{height}-{colors}c.png"
-        else:
-            output_name = Path(output_name).name
-
         response = send_file(
             buffer,
             mimetype="image/png",
-            as_attachment=False,
+            as_attachment=True,
             download_name=output_name,
         )
         response.headers["X-Output-Filename"] = output_name
