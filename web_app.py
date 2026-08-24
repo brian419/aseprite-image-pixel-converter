@@ -184,7 +184,7 @@ def _convert_request_image() -> tuple[Image.Image, str, int, int, int | None, bo
         alpha_threshold=alpha_threshold,
         resample=resample,
         dither=dither,
-        crop_transparent=False,
+        crop_transparent=isolated,
         hard_alpha=True,
         remove_background=not isolated,
     )
