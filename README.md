@@ -2,7 +2,9 @@
 
 A local macOS utility for converting large reference images into crisp, low-resolution PNGs for refinement in Aseprite.
 
-The app keeps the existing whole-image conversion workflow and adds Apple Vision smart subject lifting. In smart mode, the user can click a detected foreground subject or draw a loose lasso around it. The selected subject is lifted with the rest of the image made transparent, then passed through the same pixel conversion pipeline.
+The app supports both whole-image conversion and smart single-subject isolation. In smart mode, the user can click a foreground subject or draw a loose lasso around it. The selected subject is isolated with the rest of the image made transparent, then passed through the same pixel conversion pipeline.
+
+The user-facing interface describes this simply as **Smart subject isolation** and **Runs locally on this Mac**. Internally, the current macOS implementation uses Apple's Vision framework through a small native Swift helper.
 
 ## Main workflows
 
@@ -29,7 +31,7 @@ choose One subject - Smart Click
     ↓
 click directly on the tree / person / car / other foreground subject
     ↓
-Apple Vision identifies the foreground instance under the click
+smart subject detection identifies the foreground subject under the click
     ↓
 background becomes transparent
     ↓
@@ -47,40 +49,43 @@ choose One subject - Smart Lasso
     ↓
 draw a loose loop around the subject
     ↓
-Apple Vision detects foreground instances inside the loop
+smart subject detection finds foreground subjects inside the loop
     ↓
-the best-matching detected subject is lifted
+the best-matching detected subject is isolated
     ↓
 subject is pixel-converted and saved
 ```
 
-Smart Lasso is intentionally a rough-selection tool. The user does not need to trace the exact object edge. The lasso is used to choose among the foreground instances already detected by Apple Vision.
+Smart Lasso is intentionally a rough-selection tool. The user does not need to trace the exact object edge. The lasso is used to choose among the foreground subjects already detected by the local subject-isolation system.
 
 ## Features
 
-- Local browser interface served from `127.0.0.1`.
+- Local browser interface served from `127.0.0.1:8765`.
 - Existing whole-image automatic outer-background transparency remains available.
-- Smart Click subject selection using Apple's `VNGenerateForegroundInstanceMaskRequest`.
-- Smart Lasso selection that chooses the dominant detected Vision subject inside a freeform loop.
+- Smart Click subject isolation by clicking directly on the desired object.
+- Smart Lasso subject isolation using a loose freeform loop.
 - Click tolerance near thin branches, hair, edge pixels, and small holes by searching a small nearby region when the exact click lands on background.
 - No cloud API and no external segmentation model download.
-- No PyTorch, OpenCV, or model checkpoint required for subject lifting.
-- Isolated subject is reused for resize and palette preview changes instead of rerunning Vision every time.
+- No PyTorch, OpenCV, or model checkpoint required for subject isolation.
+- Isolated subject is reused for resize and palette preview changes instead of rerunning detection every time.
 - Transparent subject is automatically cropped before fitting to the requested output canvas.
-- Linked source and output comparison views.
-- Synchronized zoom and pan.
+- Linked Source Image and Output Preview views.
+- Smart Click, Smart Lasso, Pan, and Clear controls placed below the Source Image so the two comparison views remain vertically aligned.
+- Smart subject status card with a local-processing badge and current selection status.
+- Synchronized zoom and pan between source and output views.
 - Preview zoom up to 6400%.
 - Preserve resized colors by default or optionally limit the palette to 2-256 colors.
 - Nearest, Detail Preserve, Lanczos, Bicubic, Hamming, and Box resize methods.
 - Native macOS folder chooser.
 - Configurable output width and height.
+- Editable generated filename before saving.
 - Existing command-line whole-image converter remains available.
 
 ## Platform support
 
-The browser/Python converter is local, but Smart Click and Smart Lasso intentionally use the macOS Vision framework.
+The browser/Python converter is local. Smart Click and Smart Lasso currently use the macOS Vision framework internally.
 
-Smart subject lifting requires:
+Smart subject isolation requires:
 
 - macOS 14 or newer.
 - Xcode Command Line Tools with `swiftc` available through `xcrun` so the small native helper can be compiled locally.
@@ -98,7 +103,7 @@ If the native helper cannot be compiled, the launcher still starts the app so th
 - macOS 14+ for Smart Click / Smart Lasso
 - Xcode Command Line Tools for building the local Swift helper
 
-There is no OpenCV dependency in the smart-subject implementation.
+There is no OpenCV dependency in the current smart-subject implementation.
 
 ## Getting started
 
@@ -131,29 +136,44 @@ http://127.0.0.1:8765
 1. Load an image.
 2. Under **What should be pixelated?**, choose **One subject - Smart Click**.
 3. Click the subject in the Source Image.
-4. Wait for Apple Vision to identify and lift the subject.
+4. Wait for the local smart-subject detector to isolate it.
 5. The Output Preview shows only the selected subject after pixel conversion.
-6. If the wrong subject was selected, choose **Smart Click** in the toolbar and click a different location.
-7. Choose a save folder and convert.
+6. If the wrong subject was selected, choose **Smart Click** below the Source Image and click a different location.
+7. Use **Pan** when you want to navigate the linked comparison views without selecting another subject.
+8. Use **Clear** to discard the current selection.
+9. Choose a save folder and convert.
 
-A click does not need to land on the exact center. If the exact point is background, the helper searches a small nearby area for the nearest detected foreground instance. This helps with foliage, branches, hair, and narrow object edges.
+A click does not need to land on the exact center. If the exact point is background, the helper searches a small nearby area for the nearest detected foreground subject. This helps with foliage, branches, hair, and narrow object edges.
 
 ## Using Smart Lasso
 
 1. Choose **One subject - Smart Lasso**.
-2. Draw a rough loop around the object.
-3. Apple Vision first detects foreground instances in the full image.
-4. The helper counts the detected instance labels inside the lasso and selects the subject occupying the largest portion of the loop.
-5. The selected subject is lifted with transparency and sent through the normal converter.
+2. Draw a rough loop around the object in the Source Image.
+3. The local subject detector identifies foreground subjects in the image.
+4. The helper determines which detected subject occupies the largest useful portion of the lasso.
+5. The selected subject is isolated with transparency and sent through the normal converter.
 
-Smart Lasso is useful when a click is ambiguous or when several detected subjects are close together.
+Smart Lasso is useful when a click is ambiguous or when several detected subjects are close together. The lasso does not define the final cutout boundary, so it does not need to trace the object precisely.
 
-## How smart subject lifting works
+## User interface behavior
+
+The comparison area keeps Source Image and Output Preview aligned at the top. When a smart subject mode is enabled, its controls appear below the Source Image rather than above it.
+
+The smart-subject settings card contains:
+
+- **Smart subject isolation**
+- **Runs locally on this Mac**
+- A short mode-specific instruction
+- **Selection status**, which reports whether a subject is selected or whether another selection is needed
+
+The user-facing UI intentionally avoids exposing framework-specific implementation branding. Technical implementation details remain documented below.
+
+## Technical implementation of smart subject isolation
 
 The native helper uses Apple's Vision framework:
 
 1. `VNGenerateForegroundInstanceMaskRequest` detects noticeable foreground instances.
-2. `VNInstanceMaskObservation.instanceMask` labels the detected subjects separately from background.
+2. `VNInstanceMaskObservation.instanceMask` labels detected subjects separately from background.
 3. Smart Click maps the browser click into Vision coordinates and reads the instance label under or near that point.
 4. Smart Lasso maps the freeform polygon into the instance mask and chooses the most represented non-background instance.
 5. `generateMaskedImage(ofInstances:from:croppedToInstancesExtent:)` produces an image containing only the selected instance, with the remaining pixels transparent.
@@ -161,11 +181,33 @@ The native helper uses Apple's Vision framework:
 
 The app performs the expensive subject-detection step only when the user chooses a subject. The returned transparent PNG is retained in browser memory and reused when output size, palette, or resize settings change.
 
+All of this processing stays on the local Mac. Images are not sent to an external service.
+
 ## Automatic whole-image background transparency
 
 Whole-image mode keeps the existing conservative background inference. For opaque images, the converter estimates the dominant outer-border color and removes confirmed edge-connected background pixels while protecting narrow interior gaps from accidental transparency.
 
 Highly textured or photographic backgrounds are where Smart Click is usually more appropriate.
+
+## Output settings
+
+### Canvas size
+
+Set the target pixel dimensions manually or use the included presets such as 64, 80, 96, 128, and 160 pixels.
+
+### Color handling
+
+- **Preserve resized colors** keeps the colors produced by the resize operation without applying a palette limit.
+- **Limit palette** enables the Palette colors field, which accepts values from 2 to 256.
+
+### Resize methods
+
+- **Nearest - Recommended**: normal pixel-art reduction with hard pixel sampling.
+- **Detail Preserve - complex art**: high-quality reduction with controlled sharpening for dense references.
+- **Lanczos**: detailed interpolation during strong downscaling.
+- **Bicubic**: balanced interpolation.
+- **Hamming**: somewhat sharper interpolated reduction.
+- **Box**: simple area averaging.
 
 ## Generated filenames
 
@@ -181,7 +223,7 @@ Smart subject example:
 source-128x128-nearest-isolated-preserve.png
 ```
 
-Palette-limited example:
+Palette-limited smart subject example:
 
 ```text
 source-128x128-nearest-isolated-32c.png
@@ -197,7 +239,7 @@ The existing CLI continues to provide the whole-image workflow:
 python3 aseprite_image_pixel_converter.py input.png output.png --size 128
 ```
 
-Detail preserving resize:
+Detail-preserving resize:
 
 ```bash
 python3 aseprite_image_pixel_converter.py input.png output.png --size 128 --resample detail
@@ -219,16 +261,16 @@ With the project virtual environment active:
 python3 -m unittest discover -s tests -v
 ```
 
-The Python subject-wrapper tests mock the native process so validation can run independently of Vision. The real Vision helper itself requires a macOS 14+ machine.
+The Python subject-wrapper tests mock the native process so validation can run independently of the macOS Vision framework. The real native subject-isolation helper requires a macOS 14+ machine for end-to-end execution.
 
 ## Project structure
 
 ```text
 aseprite-image-pixel-converter/
-├── aseprite_image_pixel_converter.py   # existing pixel conversion logic and CLI
+├── aseprite_image_pixel_converter.py   # pixel conversion logic and CLI
 ├── apple_subject_lift.py               # Python validation and native-helper bridge
 ├── native/
-│   └── apple_subject_lift.swift        # Apple Vision foreground instance selector
+│   └── apple_subject_lift.swift        # native macOS foreground-instance selector
 ├── web_app.py                          # local Flask backend
 ├── web/
 │   ├── index.html                      # browser interface
@@ -242,3 +284,7 @@ aseprite-image-pixel-converter/
 ├── requirements.txt
 └── start.command
 ```
+
+## Privacy
+
+The web interface is served only from localhost. Smart subject detection and pixel conversion run locally on the Mac. The application does not require a cloud image-processing API.
