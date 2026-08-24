@@ -4,245 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Aseprite Image Pixel Converter</title>
-  <style>
-    :root {
-      color-scheme: light dark;
-      --bg: #f5f5f7;
-      --surface: #ffffff;
-      --surface-soft: #fafafa;
-      --text: #1d1d1f;
-      --secondary: #6e6e73;
-      --border: rgba(0,0,0,.12);
-      --border-strong: rgba(0,0,0,.22);
-      --blue: #0071e3;
-      --blue-hover: #0077ed;
-      --success: #1f7a45;
-      --error: #b42318;
-      --checker-a: #ececee;
-      --checker-b: #f8f8f9;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #111113;
-        --surface: #1c1c1e;
-        --surface-soft: #242426;
-        --text: #f5f5f7;
-        --secondary: #a1a1a6;
-        --border: rgba(255,255,255,.12);
-        --border-strong: rgba(255,255,255,.22);
-        --blue: #2997ff;
-        --blue-hover: #40a9ff;
-        --success: #67ce8b;
-        --error: #ff7b72;
-        --checker-a: #252527;
-        --checker-b: #2d2d30;
-      }
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-    button, input, select { font: inherit; }
-    button:focus-visible,
-    input:focus-visible,
-    select:focus-visible,
-    .compare-frame:focus-visible {
-      outline: 3px solid color-mix(in srgb, var(--blue) 30%, transparent);
-      outline-offset: 2px;
-    }
-    .page {
-      width: min(1120px, calc(100% - 40px));
-      margin: 0 auto;
-      padding: 52px 0 68px;
-    }
-    header { margin-bottom: 28px; }
-    h1 { margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -.03em; }
-    .subtitle { margin: 9px 0 0; color: var(--secondary); font-size: 16px; line-height: 1.45; }
-    .app-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      overflow: hidden;
-      box-shadow: 0 14px 36px rgba(0,0,0,.07);
-    }
-    .comparison-pane {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 24px;
-      padding: 28px;
-    }
-    .compare-panel { min-width: 0; }
-    .eyebrow { margin: 0; color: var(--secondary); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
-    .preview-heading-row {
-      min-height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 10px;
-    }
-    .source-actions,
-    .zoom-controls { display: flex; align-items: center; gap: 6px; }
-    .secondary-button,
-    .preset,
-    .zoom-button {
-      border: 1px solid var(--border);
-      background: var(--surface-soft);
-      color: var(--text);
-      cursor: pointer;
-    }
-    .secondary-button,
-    .preset {
-      min-height: 34px;
-      padding: 6px 11px;
-      border-radius: 9px;
-    }
-    .secondary-button:hover,
-    .preset:hover,
-    .zoom-button:hover:not(:disabled) { border-color: var(--border-strong); }
-    .change-image-button { min-height: 30px; padding: 4px 9px; font-size: 12px; }
-    .zoom-button {
-      width: 30px;
-      height: 30px;
-      padding: 0;
-      border-radius: 8px;
-      font-size: 18px;
-      line-height: 1;
-    }
-    .zoom-button:disabled { opacity: .4; cursor: default; }
-    .zoom-value { min-width: 56px; color: var(--secondary); font-size: 12px; text-align: center; }
-    .compare-frame {
-      height: 420px;
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      overflow: auto;
-      overscroll-behavior: contain;
-      scrollbar-gutter: stable;
-      background-color: var(--checker-b);
-      background-image:
-        linear-gradient(45deg, var(--checker-a) 25%, transparent 25%),
-        linear-gradient(-45deg, var(--checker-a) 25%, transparent 25%),
-        linear-gradient(45deg, transparent 75%, var(--checker-a) 75%),
-        linear-gradient(-45deg, transparent 75%, var(--checker-a) 75%);
-      background-size: 20px 20px;
-      background-position: 0 0, 0 10px, 10px -10px, -10px 0;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-    .compare-frame.has-image { cursor: grab; }
-    .compare-frame.has-image.panning { cursor: grabbing; }
-    .compare-frame.dragging { border-color: var(--blue); }
-    .compare-stage {
-      width: max-content;
-      min-width: 100%;
-      height: max-content;
-      min-height: 100%;
-      padding: 18px;
-      display: grid;
-      place-items: center;
-    }
-    .comparison-canvas { display: none; position: relative; flex: none; }
-    .compare-frame.has-image .comparison-canvas { display: block; }
-    .comparison-canvas img {
-      width: 100%;
-      height: 100%;
-      display: block;
-      object-fit: contain;
-      pointer-events: none;
-      -webkit-user-drag: none;
-      user-select: none;
-    }
-    #sourcePreview { image-rendering: auto; }
-    #outputPreview { image-rendering: pixelated; image-rendering: crisp-edges; }
-    .compare-frame.has-image .preview-empty { display: none; }
-    .preview-empty {
-      padding: 30px;
-      text-align: center;
-      color: var(--secondary);
-      font-size: 13px;
-      line-height: 1.45;
-      cursor: pointer;
-    }
-    .meta,
-    .preview-state {
-      margin-top: 9px;
-      min-height: 18px;
-      color: var(--secondary);
-      font-size: 12px;
-      line-height: 1.4;
-      overflow-wrap: anywhere;
-    }
-    .preview-state.error { color: var(--error); }
-    .settings-pane {
-      padding: 28px;
-      border-top: 1px solid var(--border);
-    }
-    .settings-title { margin-bottom: 20px; }
-    .settings-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 20px 24px;
-    }
-    .control { min-width: 0; }
-    .control.full-width,
-    .action { grid-column: 1 / -1; }
-    .control.inactive { opacity: .58; }
-    .label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
-    label { font-size: 13px; font-weight: 600; }
-    .hint { color: var(--secondary); font-size: 11px; }
-    .field-note { margin: 7px 1px 0; color: var(--secondary); font-size: 11px; line-height: 1.4; }
-    input[type="number"],
-    input[type="text"],
-    select {
-      width: 100%;
-      height: 40px;
-      padding: 0 11px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--surface-soft);
-      color: var(--text);
-    }
-    input:disabled { cursor: not-allowed; }
-    .size-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
-    .times { color: var(--secondary); }
-    .presets { display: flex; gap: 7px; margin-top: 8px; flex-wrap: wrap; }
-    .folder-box {
-      padding: 11px 12px;
-      border: 1px solid var(--border);
-      border-radius: 11px;
-      background: var(--surface-soft);
-    }
-    .folder-path { margin-top: 8px; color: var(--secondary); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
-    .action { border-top: 1px solid var(--border); padding-top: 20px; }
-    .primary {
-      width: 100%;
-      min-height: 44px;
-      border: 0;
-      border-radius: 10px;
-      background: var(--blue);
-      color: white;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .primary:hover { background: var(--blue-hover); }
-    .primary:disabled { opacity: .45; cursor: default; }
-    .status { margin-top: 10px; min-height: 20px; color: var(--secondary); font-size: 12px; line-height: 1.45; }
-    .status.success { color: var(--success); }
-    .status.error { color: var(--error); }
-    .privacy { margin: 17px 3px 0; color: var(--secondary); font-size: 11px; line-height: 1.45; }
-    @media (max-width: 760px) {
-      .page { width: min(100% - 24px, 620px); padding-top: 28px; }
-      .comparison-pane,
-      .settings-grid { grid-template-columns: 1fr; }
-      .compare-frame { height: 340px; }
-      .control.full-width,
-      .action { grid-column: auto; }
-    }
-  </style>
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <main class="page">
@@ -257,13 +19,25 @@
           <div class="preview-heading-row">
             <p id="sourceHeading" class="eyebrow">SOURCE IMAGE</p>
             <div class="source-actions">
-              <button id="changeImageButton" class="secondary-button change-image-button" type="button" hidden>Change Image…</button>
+              <button id="changeImageButton" class="secondary-button change-image-button" type="button" hidden>Change Image...</button>
             </div>
           </div>
+
+          <div id="objectToolbar" class="object-toolbar" hidden aria-label="Object selection tools">
+            <div class="tool-group" role="group" aria-label="Selection tool">
+              <button class="tool-button active" type="button" data-tool="box">Box</button>
+              <button class="tool-button" type="button" data-tool="keep">Keep</button>
+              <button class="tool-button" type="button" data-tool="remove">Remove</button>
+              <button class="tool-button" type="button" data-tool="pan">Pan</button>
+            </div>
+            <button id="clearSelectionButton" class="secondary-button compact-button" type="button">Clear</button>
+          </div>
+
           <div id="sourceFrame" class="compare-frame" tabindex="0" aria-label="Source image comparison view">
             <div class="compare-stage">
               <div id="sourceCanvas" class="comparison-canvas">
                 <img id="sourcePreview" alt="Source image comparison preview" draggable="false">
+                <canvas id="selectionOverlay" class="selection-overlay" aria-hidden="true"></canvas>
               </div>
               <div class="preview-empty">
                 <strong>Drop an image here</strong><br>
@@ -279,7 +53,7 @@
           <div class="preview-heading-row">
             <p id="outputHeading" class="eyebrow">OUTPUT PREVIEW</p>
             <div class="zoom-controls" aria-label="Linked comparison zoom controls">
-              <button id="zoomOutButton" class="zoom-button" type="button" aria-label="Zoom out" disabled>−</button>
+              <button id="zoomOutButton" class="zoom-button" type="button" aria-label="Zoom out" disabled>-</button>
               <span id="zoomValue" class="zoom-value">100%</span>
               <button id="zoomInButton" class="zoom-button" type="button" aria-label="Zoom in" disabled>+</button>
             </div>
@@ -299,11 +73,47 @@
       <div class="settings-pane">
         <p class="eyebrow settings-title">OUTPUT SETTINGS</p>
         <div class="settings-grid">
+          <div class="control full-width">
+            <div class="label-row">
+              <label for="isolationMode">What should be pixelated?</label>
+            </div>
+            <select id="isolationMode">
+              <option value="auto" selected>Whole image / automatic outer background removal</option>
+              <option value="object">Only one selected object</option>
+            </select>
+            <p id="isolationNote" class="field-note">The current automatic background behavior stays enabled.</p>
+          </div>
+
+          <div id="objectSettings" class="control full-width object-settings" hidden>
+            <div class="object-settings-grid">
+              <div>
+                <div class="label-row">
+                  <label for="refineSize">Object selection</label>
+                  <span class="hint">local GrabCut segmentation</span>
+                </div>
+                <p class="field-note object-instructions">
+                  Choose <strong>Box</strong>, then drag a rectangle around the object in the Source Image.
+                  If the result misses part of the object, choose <strong>Keep</strong> and click that area.
+                  Choose <strong>Remove</strong> and click unwanted background. Use <strong>Pan</strong> when zoomed in.
+                </p>
+              </div>
+              <div>
+                <div class="label-row"><label for="refineSize">Keep / Remove mark size</label></div>
+                <select id="refineSize">
+                  <option value="0.010">Small</option>
+                  <option value="0.018" selected>Medium</option>
+                  <option value="0.030">Large</option>
+                </select>
+                <p id="selectionSummary" class="field-note">No object box drawn yet.</p>
+              </div>
+            </div>
+          </div>
+
           <div class="control">
             <div class="label-row"><label for="width">Canvas size</label><span class="hint">pixels</span></div>
             <div class="size-row">
               <input id="width" type="number" min="8" max="1024" value="128" aria-label="Output width">
-              <span class="times">×</span>
+              <span class="times">x</span>
               <input id="height" type="number" min="8" max="1024" value="128" aria-label="Output height">
             </div>
             <div class="presets">
@@ -318,14 +128,14 @@
           <div class="control">
             <div class="label-row"><label for="colorMode">Color handling</label></div>
             <select id="colorMode">
-              <option value="preserve" selected>Preserve resized colors — no palette limit</option>
-              <option value="limit">Limit palette — use color count below</option>
+              <option value="preserve" selected>Preserve resized colors - no palette limit</option>
+              <option value="limit">Limit palette - use color count below</option>
             </select>
             <p class="field-note">Choose Limit palette to enable the Palette colors setting.</p>
           </div>
 
           <div id="paletteControl" class="control inactive">
-            <div class="label-row"><label for="colors">Palette colors</label><span class="hint">2–256</span></div>
+            <div class="label-row"><label for="colors">Palette colors</label><span class="hint">2-256</span></div>
             <input id="colors" type="number" min="2" max="256" value="32" disabled>
             <p class="field-note">32 is a starting value. Adjust it when Limit palette is selected.</p>
           </div>
@@ -333,12 +143,12 @@
           <div class="control">
             <div class="label-row"><label for="resample">Resize method</label></div>
             <select id="resample">
-              <option value="nearest" selected>Nearest — Recommended</option>
-              <option value="detail">Detail Preserve — complex art</option>
-              <option value="lanczos">Lanczos — detailed interpolation</option>
-              <option value="bicubic">Bicubic — balanced</option>
-              <option value="hamming">Hamming — sharper reduction</option>
-              <option value="box">Box — simple area averaging</option>
+              <option value="nearest" selected>Nearest - Recommended</option>
+              <option value="detail">Detail Preserve - complex art</option>
+              <option value="lanczos">Lanczos - detailed interpolation</option>
+              <option value="bicubic">Bicubic - balanced</option>
+              <option value="hamming">Hamming - sharper reduction</option>
+              <option value="box">Box - simple area averaging</option>
             </select>
           </div>
 
@@ -350,7 +160,7 @@
           <div class="control full-width">
             <div class="label-row"><label>Save location</label></div>
             <div class="folder-box">
-              <button id="folderButton" class="secondary-button" type="button">Choose Folder…</button>
+              <button id="folderButton" class="secondary-button" type="button">Choose Folder...</button>
               <div id="folderPath" class="folder-path">Choose a folder for this conversion.</div>
             </div>
           </div>
@@ -362,356 +172,9 @@
         </div>
       </div>
     </section>
-    <p class="privacy">The interface is served from localhost. Images are processed locally and are not sent to an external service.</p>
+    <p class="privacy">The interface is served from localhost. Images and object-selection processing stay on this computer and are not sent to an external service.</p>
   </main>
 
-  <script>
-    const sourceFrame = document.getElementById('sourceFrame');
-    const outputFrame = document.getElementById('outputFrame');
-    const sourceCanvas = document.getElementById('sourceCanvas');
-    const outputCanvas = document.getElementById('outputCanvas');
-    const sourcePreview = document.getElementById('sourcePreview');
-    const outputPreview = document.getElementById('outputPreview');
-    const fileInput = document.getElementById('fileInput');
-    const changeImageButton = document.getElementById('changeImageButton');
-    const fileMeta = document.getElementById('fileMeta');
-    const previewState = document.getElementById('previewState');
-    const zoomOutButton = document.getElementById('zoomOutButton');
-    const zoomInButton = document.getElementById('zoomInButton');
-    const zoomValue = document.getElementById('zoomValue');
-    const widthInput = document.getElementById('width');
-    const heightInput = document.getElementById('height');
-    const colorModeInput = document.getElementById('colorMode');
-    const paletteControl = document.getElementById('paletteControl');
-    const colorsInput = document.getElementById('colors');
-    const resampleInput = document.getElementById('resample');
-    const outputName = document.getElementById('outputName');
-    const folderButton = document.getElementById('folderButton');
-    const folderPath = document.getElementById('folderPath');
-    const convertButton = document.getElementById('convertButton');
-    const status = document.getElementById('status');
-
-    let selectedFile = null;
-    let sourcePreviewUrl = null;
-    let outputPreviewUrl = null;
-    let hasOutputFolder = false;
-    let previewTimer = null;
-    let previewRequestId = 0;
-    let sourceRequestId = 0;
-    let previewZoom = 1;
-    let syncingScroll = false;
-    const zoomSteps = [0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64];
-
-    function setStatus(message, kind = '') {
-      status.textContent = message;
-      status.className = `status ${kind}`.trim();
-    }
-    function setPreviewState(message, kind = '') {
-      previewState.textContent = message;
-      previewState.className = `preview-state ${kind}`.trim();
-    }
-    function updateConvertState() {
-      convertButton.disabled = !(selectedFile && hasOutputFolder);
-    }
-    function baseName(name) {
-      const dot = name.lastIndexOf('.');
-      return dot > 0 ? name.slice(0, dot) : name;
-    }
-    function paletteIsLimited() {
-      return colorModeInput.value === 'limit';
-    }
-    function refreshColorControls() {
-      const limited = paletteIsLimited();
-      colorsInput.disabled = !limited;
-      paletteControl.classList.toggle('inactive', !limited);
-    }
-    function refreshSuggestedName() {
-      const stem = selectedFile ? baseName(selectedFile.name) : 'converted';
-      const parts = [stem, `${widthInput.value}x${heightInput.value}`, resampleInput.value];
-      if (paletteIsLimited()) {
-        parts.push(`${colorsInput.value}c`);
-      } else {
-        parts.push('preserve');
-      }
-      outputName.value = `${parts.join('-')}.png`;
-    }
-    function buildConversionForm(includeOutputName = false) {
-      const form = new FormData();
-      form.append('image', selectedFile);
-      form.append('width', widthInput.value);
-      form.append('height', heightInput.value);
-      form.append('color_mode', colorModeInput.value);
-      form.append('colors', colorsInput.value);
-      form.append('resample', resampleInput.value);
-      form.append('alpha_threshold', '8');
-      if (includeOutputName) form.append('output_name', outputName.value);
-      return form;
-    }
-    function buildSourcePreviewForm() {
-      const form = new FormData();
-      form.append('image', selectedFile);
-      form.append('alpha_threshold', '8');
-      return form;
-    }
-    function suggestedPreviewZoom() {
-      const width = Number(widthInput.value) || 128;
-      const height = Number(heightInput.value) || 128;
-      const largestSide = Math.max(width, height);
-      if (largestSide <= 64) return 6;
-      if (largestSide <= 96) return 4;
-      if (largestSide <= 160) return 3;
-      if (largestSide <= 256) return 2;
-      return 1;
-    }
-    function applyCanvasGeometry() {
-      const width = Math.max(8, Number(widthInput.value) || 128) * previewZoom;
-      const height = Math.max(8, Number(heightInput.value) || 128) * previewZoom;
-      for (const canvas of [sourceCanvas, outputCanvas]) {
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
-      }
-      zoomValue.textContent = `${Math.round(previewZoom * 100)}%`;
-      const index = zoomSteps.indexOf(previewZoom);
-      zoomOutButton.disabled = !selectedFile || index <= 0;
-      zoomInButton.disabled = !selectedFile || index < 0 || index >= zoomSteps.length - 1;
-    }
-    function viewCenter(frame) {
-      const scrollableWidth = Math.max(1, frame.scrollWidth);
-      const scrollableHeight = Math.max(1, frame.scrollHeight);
-      return {
-        x: (frame.scrollLeft + frame.clientWidth / 2) / scrollableWidth,
-        y: (frame.scrollTop + frame.clientHeight / 2) / scrollableHeight,
-      };
-    }
-    function restoreViewCenter(center) {
-      requestAnimationFrame(() => {
-        for (const frame of [sourceFrame, outputFrame]) {
-          frame.scrollLeft = Math.max(0, center.x * frame.scrollWidth - frame.clientWidth / 2);
-          frame.scrollTop = Math.max(0, center.y * frame.scrollHeight - frame.clientHeight / 2);
-        }
-      });
-    }
-    function setPreviewZoom(zoom) {
-      const center = viewCenter(outputFrame);
-      previewZoom = zoom;
-      applyCanvasGeometry();
-      restoreViewCenter(center);
-    }
-    function stepPreviewZoom(direction) {
-      let index = zoomSteps.indexOf(previewZoom);
-      if (index < 0) index = zoomSteps.findIndex(value => value >= previewZoom);
-      if (index < 0) index = zoomSteps.length - 1;
-      index = Math.max(0, Math.min(zoomSteps.length - 1, index + direction));
-      setPreviewZoom(zoomSteps[index]);
-    }
-    function syncFrames(source, target) {
-      if (syncingScroll) return;
-      syncingScroll = true;
-      target.scrollLeft = source.scrollLeft;
-      target.scrollTop = source.scrollTop;
-      requestAnimationFrame(() => { syncingScroll = false; });
-    }
-    sourceFrame.addEventListener('scroll', () => syncFrames(sourceFrame, outputFrame));
-    outputFrame.addEventListener('scroll', () => syncFrames(outputFrame, sourceFrame));
-
-    function enablePanning(frame) {
-      let isPanning = false;
-      let startX = 0;
-      let startY = 0;
-      let startLeft = 0;
-      let startTop = 0;
-      const stop = pointerId => {
-        if (!isPanning) return;
-        isPanning = false;
-        frame.classList.remove('panning');
-        if (pointerId !== null && frame.hasPointerCapture(pointerId)) frame.releasePointerCapture(pointerId);
-      };
-      frame.addEventListener('pointerdown', event => {
-        if (!frame.classList.contains('has-image') || event.button !== 0) return;
-        isPanning = true;
-        startX = event.clientX;
-        startY = event.clientY;
-        startLeft = frame.scrollLeft;
-        startTop = frame.scrollTop;
-        frame.classList.add('panning');
-        frame.setPointerCapture(event.pointerId);
-        event.preventDefault();
-      });
-      frame.addEventListener('pointermove', event => {
-        if (!isPanning) return;
-        frame.scrollLeft = startLeft - (event.clientX - startX);
-        frame.scrollTop = startTop - (event.clientY - startY);
-        event.preventDefault();
-      });
-      frame.addEventListener('pointerup', event => stop(event.pointerId));
-      frame.addEventListener('pointercancel', event => stop(event.pointerId));
-      frame.addEventListener('lostpointercapture', () => stop(null));
-    }
-    enablePanning(sourceFrame);
-    enablePanning(outputFrame);
-    sourcePreview.addEventListener('dragstart', event => event.preventDefault());
-    outputPreview.addEventListener('dragstart', event => event.preventDefault());
-
-    async function renderSourceComparison() {
-      if (!selectedFile) return;
-      const requestId = ++sourceRequestId;
-      try {
-        const response = await fetch('/api/source-preview', { method: 'POST', body: buildSourcePreviewForm() });
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Source preview could not be generated.');
-        }
-        const blob = await response.blob();
-        if (requestId !== sourceRequestId) return;
-        if (sourcePreviewUrl) URL.revokeObjectURL(sourcePreviewUrl);
-        sourcePreviewUrl = URL.createObjectURL(blob);
-        sourcePreview.src = sourcePreviewUrl;
-        sourceFrame.classList.add('has-image');
-      } catch (error) {
-        if (requestId !== sourceRequestId) return;
-        sourceFrame.classList.remove('has-image');
-        setPreviewState(error.message, 'error');
-      }
-    }
-    async function renderOutputPreview() {
-      if (!selectedFile) return;
-      const requestId = ++previewRequestId;
-      setPreviewState('Updating preview…');
-      try {
-        const response = await fetch('/api/preview', { method: 'POST', body: buildConversionForm(false) });
-        if (!response.ok) {
-          const contentType = response.headers.get('content-type') || '';
-          const data = contentType.includes('application/json') ? await response.json() : {};
-          throw new Error(data.error || 'Preview could not be generated.');
-        }
-        const blob = await response.blob();
-        if (requestId !== previewRequestId) return;
-        if (outputPreviewUrl) URL.revokeObjectURL(outputPreviewUrl);
-        outputPreviewUrl = URL.createObjectURL(blob);
-        outputPreview.src = outputPreviewUrl;
-        outputFrame.classList.add('has-image');
-        const colorText = paletteIsLimited() ? `up to ${colorsInput.value} colors` : 'resized colors preserved';
-        setPreviewState(`${widthInput.value} × ${heightInput.value} · ${colorText}`);
-      } catch (error) {
-        if (requestId !== previewRequestId) return;
-        outputFrame.classList.remove('has-image');
-        setPreviewState(error.message, 'error');
-      }
-    }
-    function scheduleOutputPreview() {
-      if (!selectedFile) return;
-      window.clearTimeout(previewTimer);
-      previewTimer = window.setTimeout(renderOutputPreview, 250);
-    }
-    async function chooseFile(file) {
-      if (!file || !file.type.startsWith('image/')) {
-        setStatus('Choose a PNG, JPEG, or WebP image.', 'error');
-        return;
-      }
-      selectedFile = file;
-      fileMeta.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
-      changeImageButton.hidden = false;
-      refreshSuggestedName();
-      previewZoom = suggestedPreviewZoom();
-      applyCanvasGeometry();
-      sourceFrame.scrollTop = 0;
-      sourceFrame.scrollLeft = 0;
-      outputFrame.scrollTop = 0;
-      outputFrame.scrollLeft = 0;
-      updateConvertState();
-      setStatus(hasOutputFolder ? 'Ready to convert.' : 'Choose an output folder.');
-      await renderSourceComparison();
-      scheduleOutputPreview();
-    }
-
-    sourceFrame.addEventListener('click', () => { if (!selectedFile) fileInput.click(); });
-    sourceFrame.addEventListener('keydown', event => {
-      if (!selectedFile && (event.key === 'Enter' || event.key === ' ')) {
-        event.preventDefault();
-        fileInput.click();
-      }
-    });
-    changeImageButton.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', () => chooseFile(fileInput.files[0]));
-    ['dragenter', 'dragover'].forEach(type => sourceFrame.addEventListener(type, event => {
-      event.preventDefault();
-      sourceFrame.classList.add('dragging');
-    }));
-    ['dragleave', 'drop'].forEach(type => sourceFrame.addEventListener(type, event => {
-      event.preventDefault();
-      sourceFrame.classList.remove('dragging');
-    }));
-    sourceFrame.addEventListener('drop', event => chooseFile(event.dataTransfer.files[0]));
-
-    document.querySelectorAll('.preset').forEach(button => button.addEventListener('click', () => {
-      widthInput.value = button.dataset.size;
-      heightInput.value = button.dataset.size;
-      refreshSuggestedName();
-      previewZoom = suggestedPreviewZoom();
-      applyCanvasGeometry();
-      scheduleOutputPreview();
-    }));
-    [widthInput, heightInput].forEach(input => input.addEventListener('input', () => {
-      refreshSuggestedName();
-      applyCanvasGeometry();
-      scheduleOutputPreview();
-    }));
-    colorModeInput.addEventListener('change', () => {
-      refreshColorControls();
-      refreshSuggestedName();
-      scheduleOutputPreview();
-    });
-    colorsInput.addEventListener('input', () => {
-      refreshSuggestedName();
-      if (paletteIsLimited()) scheduleOutputPreview();
-    });
-    resampleInput.addEventListener('change', () => {
-      refreshSuggestedName();
-      scheduleOutputPreview();
-    });
-    zoomOutButton.addEventListener('click', () => stepPreviewZoom(-1));
-    zoomInButton.addEventListener('click', () => stepPreviewZoom(1));
-
-    folderButton.addEventListener('click', async () => {
-      folderButton.disabled = true;
-      setStatus('Opening folder chooser…');
-      try {
-        const response = await fetch('/api/choose-folder', { method: 'POST' });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Could not choose a folder.');
-        if (data.cancelled) {
-          setStatus(selectedFile ? 'Choose an output folder.' : 'Choose an image and output folder to begin.');
-          return;
-        }
-        hasOutputFolder = true;
-        folderPath.textContent = data.path;
-        updateConvertState();
-        setStatus(selectedFile ? 'Ready to convert.' : 'Choose an image.');
-      } catch (error) {
-        setStatus(error.message, 'error');
-      } finally {
-        folderButton.disabled = false;
-      }
-    });
-    convertButton.addEventListener('click', async () => {
-      if (!selectedFile || !hasOutputFolder) return;
-      convertButton.disabled = true;
-      setStatus('Converting…');
-      try {
-        const response = await fetch('/api/convert', { method: 'POST', body: buildConversionForm(true) });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Conversion failed.');
-        hasOutputFolder = false;
-        folderPath.textContent = 'Choose a folder for the next conversion.';
-        updateConvertState();
-        setStatus(`Saved ${data.filename}`, 'success');
-      } catch (error) {
-        updateConvertState();
-        setStatus(error.message, 'error');
-      }
-    });
-
-    refreshColorControls();
-  </script>
+  <script src="/app.js"></script>
 </body>
 </html>

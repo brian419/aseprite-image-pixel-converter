@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
 import re
 import subprocess
@@ -13,6 +14,7 @@ from PIL import Image, UnidentifiedImageError
 from waitress import serve
 
 from aseprite_image_pixel_converter import auto_remove_background, convert_pil_image
+from object_isolation import isolate_object
 
 APP_HOST = "127.0.0.1"
 APP_PORT = 8765
@@ -36,6 +38,34 @@ def _int_form(name: str, default: int, minimum: int, maximum: int) -> int:
     return value
 
 
+def _float_form(name: str, default: float, minimum: float, maximum: float) -> float:
+    raw = request.form.get(name, str(default))
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number.") from exc
+    if not minimum <= value <= maximum:
+        raise ValueError(f"{name} must be between {minimum} and {maximum}.")
+    return value
+
+
+def _json_form(name: str, default):
+    raw = request.form.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{name} contains invalid selection data.") from exc
+
+
+def _isolation_mode() -> str:
+    mode = request.form.get("isolation_mode", "auto")
+    if mode not in {"auto", "object"}:
+        raise ValueError("Unknown object isolation mode.")
+    return mode
+
+
 def _safe_stem(filename: str) -> str:
     stem = Path(filename).stem.strip() or "converted-image"
     stem = re.sub(r"[^A-Za-z0-9._ -]+", "-", stem)
@@ -50,6 +80,7 @@ def _safe_output_name(
     colors: int | None,
     resample: str,
     dither: str,
+    isolated: bool = False,
 ) -> str:
     requested = requested.strip()
     if requested.lower().endswith(".png"):
@@ -58,6 +89,8 @@ def _safe_output_name(
         return f"{stem}.png" if not stem.lower().endswith(".png") else stem
 
     parts = [_safe_stem(source_name), f"{width}x{height}", resample]
+    if isolated:
+        parts.append("isolated")
     if colors is None:
         parts.append("preserve")
     else:
@@ -99,8 +132,32 @@ def _read_uploaded_rgba() -> tuple[Image.Image, str]:
     return source, upload.filename
 
 
-def _convert_request_image() -> tuple[Image.Image, str, int, int, int | None]:
+def _isolate_if_requested(source: Image.Image) -> tuple[Image.Image, bool]:
+    mode = _isolation_mode()
+    if mode == "auto":
+        return source, False
+
+    selection_rect = _json_form("selection_rect", None)
+    if selection_rect is None:
+        raise ValueError("Draw a selection box around the object first.")
+
+    keep_points = _json_form("keep_points", [])
+    remove_points = _json_form("remove_points", [])
+    refine_radius = _float_form("refine_radius", 0.018, 0.002, 0.08)
+
+    isolated = isolate_object(
+        source,
+        selection_rect=selection_rect,
+        keep_points=keep_points,
+        remove_points=remove_points,
+        refine_radius=refine_radius,
+    )
+    return isolated, True
+
+
+def _convert_request_image() -> tuple[Image.Image, str, int, int, int | None, bool]:
     source, source_name = _read_uploaded_rgba()
+    source, isolated = _isolate_if_requested(source)
 
     width = _int_form("width", 128, 8, 1024)
     height = _int_form("height", 128, 8, 1024)
@@ -129,9 +186,9 @@ def _convert_request_image() -> tuple[Image.Image, str, int, int, int | None]:
         dither=dither,
         crop_transparent=False,
         hard_alpha=True,
-        remove_background=True,
+        remove_background=not isolated,
     )
-    return result, source_name, width, height, colors
+    return result, source_name, width, height, colors, isolated
 
 
 @app.get("/")
@@ -161,7 +218,11 @@ def choose_folder():
 def source_preview():
     try:
         source, _source_name = _read_uploaded_rgba()
-        source = auto_remove_background(source)
+        # In object-selection mode the unmodified source stays visible so the user
+        # can draw and refine the selection against the full image.
+        if _isolation_mode() == "auto":
+            source = auto_remove_background(source)
+
         buffer = io.BytesIO()
         source.save(buffer, format="PNG", optimize=False)
         buffer.seek(0)
@@ -175,7 +236,7 @@ def source_preview():
 @app.post("/api/preview")
 def preview():
     try:
-        result, _source_name, _width, _height, _colors = _convert_request_image()
+        result, _source_name, _width, _height, _colors, _isolated = _convert_request_image()
         buffer = io.BytesIO()
         result.save(buffer, format="PNG", optimize=False)
         buffer.seek(0)
@@ -194,7 +255,7 @@ def convert():
         return jsonify({"error": "Choose an output folder before converting."}), 400
 
     try:
-        result, source_name, width, height, colors = _convert_request_image()
+        result, source_name, width, height, colors, isolated = _convert_request_image()
         resample = request.form.get("resample", "nearest")
         dither = request.form.get("dither", "none")
         output_name = _safe_output_name(
@@ -205,6 +266,7 @@ def convert():
             colors,
             resample,
             dither,
+            isolated=isolated,
         )
 
         output_directory = _selected_output_directory
