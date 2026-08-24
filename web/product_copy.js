@@ -28,9 +28,12 @@
   const selectionSummary = document.getElementById('selectionSummary');
   const selectionStatusCopy = selectionSummary?.closest('.selection-status-copy');
   const fileMeta = document.getElementById('fileMeta');
+  const fileInput = document.getElementById('fileInput');
   const previewState = document.getElementById('previewState');
+  const outputName = document.getElementById('outputName');
   let smartLassoFallback = null;
   let automaticResultFallback = null;
+  let shortFilenameCheckbox = null;
 
   if (selectionStatusCopy) {
     smartLassoFallback = document.createElement('p');
@@ -50,8 +53,55 @@
     previewState.insertAdjacentElement('afterend', automaticResultFallback);
   }
 
+  if (outputName) {
+    const shortFilenameOption = document.createElement('label');
+    shortFilenameOption.style.display = 'flex';
+    shortFilenameOption.style.alignItems = 'center';
+    shortFilenameOption.style.gap = '7px';
+    shortFilenameOption.style.margin = '8px 1px 0';
+    shortFilenameOption.style.color = 'var(--secondary)';
+    shortFilenameOption.style.fontSize = '11px';
+    shortFilenameOption.style.fontWeight = '400';
+    shortFilenameOption.style.cursor = 'pointer';
+
+    shortFilenameCheckbox = document.createElement('input');
+    shortFilenameCheckbox.type = 'checkbox';
+    shortFilenameCheckbox.id = 'shortFilename';
+    shortFilenameCheckbox.style.margin = '0';
+    shortFilenameCheckbox.style.accentColor = 'var(--blue)';
+
+    const shortFilenameText = document.createElement('span');
+    shortFilenameText.textContent = 'Short filename (original-name-converted.png)';
+
+    shortFilenameOption.append(shortFilenameCheckbox, shortFilenameText);
+    outputName.insertAdjacentElement('afterend', shortFilenameOption);
+  }
+
   function imageIsLoaded() {
     return Boolean(fileMeta && fileMeta.textContent.trim() && fileMeta.textContent.trim() !== 'No image selected');
+  }
+
+  function sourceStem() {
+    const file = fileInput?.files?.[0];
+    const name = file?.name || fileMeta?.textContent.split(' · ')[0] || 'image';
+    const dot = name.lastIndexOf('.');
+    return dot > 0 ? name.slice(0, dot) : name;
+  }
+
+  function shortOutputName() {
+    const stem = sourceStem();
+    return `${stem.toLowerCase().endsWith('-converted') ? stem : `${stem}-converted`}.png`;
+  }
+
+  function syncShortFilename() {
+    if (!shortFilenameCheckbox?.checked || !outputName || !imageIsLoaded()) return;
+    outputName.value = shortOutputName();
+  }
+
+  function restoreDetailedFilename() {
+    if (typeof window.refreshSuggestedName === 'function') {
+      window.refreshSuggestedName();
+    }
   }
 
   function syncFallbackGuidance() {
@@ -70,9 +120,35 @@
   cleanNode(document.body);
   syncFallbackGuidance();
 
-  isolationModeInput?.addEventListener('change', syncFallbackGuidance);
+  shortFilenameCheckbox?.addEventListener('change', () => {
+    if (shortFilenameCheckbox.checked) {
+      syncShortFilename();
+    } else {
+      restoreDetailedFilename();
+    }
+  });
+
+  fileInput?.addEventListener('change', () => window.setTimeout(syncShortFilename, 0));
+  isolationModeInput?.addEventListener('change', () => {
+    syncFallbackGuidance();
+    window.setTimeout(syncShortFilename, 0);
+  });
+
+  ['width', 'height', 'colorMode', 'colors', 'resample'].forEach(id => {
+    const control = document.getElementById(id);
+    control?.addEventListener('input', () => window.setTimeout(syncShortFilename, 0));
+    control?.addEventListener('change', () => window.setTimeout(syncShortFilename, 0));
+  });
+
+  document.querySelectorAll('.preset').forEach(button => {
+    button.addEventListener('click', () => window.setTimeout(syncShortFilename, 0));
+  });
+
   document.querySelectorAll('[data-tool]').forEach(button => {
-    button.addEventListener('click', () => window.setTimeout(syncFallbackGuidance, 0));
+    button.addEventListener('click', () => {
+      window.setTimeout(syncFallbackGuidance, 0);
+      window.setTimeout(syncShortFilename, 0);
+    });
   });
 
   const observer = new MutationObserver(mutations => {
