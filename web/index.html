@@ -23,15 +23,6 @@
             </div>
           </div>
 
-          <div id="objectToolbar" class="object-toolbar" hidden aria-label="Smart subject selection tools">
-            <div class="tool-group" role="group" aria-label="Subject selection tool">
-              <button class="tool-button active" type="button" data-tool="click">Smart Click</button>
-              <button class="tool-button" type="button" data-tool="lasso">Smart Lasso</button>
-              <button class="tool-button" type="button" data-tool="pan">Pan</button>
-            </div>
-            <button id="clearSelectionButton" class="secondary-button compact-button" type="button">Clear</button>
-          </div>
-
           <div id="sourceFrame" class="compare-frame" tabindex="0" aria-label="Source image comparison view">
             <div class="compare-stage">
               <div id="sourceCanvas" class="comparison-canvas">
@@ -44,7 +35,18 @@
               </div>
             </div>
           </div>
-          <div id="fileMeta" class="meta">No image selected</div>
+
+          <div class="source-footer">
+            <div id="objectToolbar" class="object-toolbar" hidden aria-label="Smart subject selection tools">
+              <div class="tool-group" role="group" aria-label="Subject selection tool">
+                <button class="tool-button active" type="button" data-tool="click">Smart Click</button>
+                <button class="tool-button" type="button" data-tool="lasso">Smart Lasso</button>
+                <button class="tool-button" type="button" data-tool="pan">Pan</button>
+              </div>
+              <button id="clearSelectionButton" class="secondary-button compact-button" type="button">Clear</button>
+            </div>
+            <div id="fileMeta" class="meta">No image selected</div>
+          </div>
           <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
         </section>
 
@@ -86,18 +88,22 @@
 
           <div id="objectSettings" class="control full-width object-settings" hidden>
             <div class="object-settings-grid">
-              <div>
-                <div class="label-row">
+              <div class="object-copy">
+                <div class="object-title-row">
                   <label>Smart subject isolation</label>
-                  <span class="hint">Apple Vision · local on this Mac</span>
+                  <span class="local-badge">Apple Vision · local</span>
                 </div>
                 <p id="objectInstructions" class="field-note object-instructions">
                   Click directly on the object you want. Apple Vision detects the complete foreground subject and removes everything else.
                 </p>
               </div>
-              <div>
-                <div class="label-row"><label>Selection status</label></div>
-                <p id="selectionSummary" class="field-note selection-summary">No subject selected yet.</p>
+
+              <div class="selection-status" aria-live="polite">
+                <span class="selection-status-dot" aria-hidden="true"></span>
+                <div class="selection-status-copy">
+                  <span class="selection-status-label">Selection status</span>
+                  <p id="selectionSummary" class="field-note selection-summary">No subject selected yet.</p>
+                </div>
               </div>
             </div>
           </div>
