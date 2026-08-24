@@ -18,9 +18,9 @@ const isolationModeInput = document.getElementById('isolationMode');
 const isolationNote = document.getElementById('isolationNote');
 const objectSettings = document.getElementById('objectSettings');
 const objectToolbar = document.getElementById('objectToolbar');
-const clearSelectionButton = document.getElementById('clearSelectionButton');
-const refineSizeInput = document.getElementById('refineSize');
+const objectInstructions = document.getElementById('objectInstructions');
 const selectionSummary = document.getElementById('selectionSummary');
+const clearSelectionButton = document.getElementById('clearSelectionButton');
 const colorModeInput = document.getElementById('colorMode');
 const paletteControl = document.getElementById('paletteControl');
 const colorsInput = document.getElementById('colors');
@@ -32,21 +32,21 @@ const convertButton = document.getElementById('convertButton');
 const status = document.getElementById('status');
 
 let selectedFile = null;
+let isolatedSubjectBlob = null;
 let sourcePreviewUrl = null;
 let outputPreviewUrl = null;
 let hasOutputFolder = false;
 let previewTimer = null;
 let previewRequestId = 0;
 let sourceRequestId = 0;
+let isolationRequestId = 0;
 let previewZoom = 1;
 let syncingScroll = false;
 
-let selectionRect = null;
-let keepPoints = [];
-let removePoints = [];
-let selectionTool = 'box';
-let boxStart = null;
-let pendingRect = null;
+let selectionTool = 'click';
+let selectionPoint = null;
+let lassoPoints = [];
+let drawingLasso = false;
 
 const zoomSteps = [0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64];
 
@@ -60,12 +60,12 @@ function setPreviewState(message, kind = '') {
   previewState.className = `preview-state ${kind}`.trim();
 }
 
-function objectIsolationEnabled() {
-  return isolationModeInput.value === 'object';
+function smartIsolationEnabled() {
+  return isolationModeInput.value !== 'auto';
 }
 
 function selectionReady() {
-  return !objectIsolationEnabled() || selectionRect !== null;
+  return !smartIsolationEnabled() || isolatedSubjectBlob !== null;
 }
 
 function updateConvertState() {
@@ -90,23 +90,13 @@ function refreshColorControls() {
 function refreshSuggestedName() {
   const stem = selectedFile ? baseName(selectedFile.name) : 'converted';
   const parts = [stem, `${widthInput.value}x${heightInput.value}`, resampleInput.value];
-  if (objectIsolationEnabled()) parts.push('isolated');
+  if (smartIsolationEnabled()) parts.push('isolated');
   if (paletteIsLimited()) {
     parts.push(`${colorsInput.value}c`);
   } else {
     parts.push('preserve');
   }
   outputName.value = `${parts.join('-')}.png`;
-}
-
-function appendIsolationData(form) {
-  form.append('isolation_mode', isolationModeInput.value);
-  if (!objectIsolationEnabled()) return;
-
-  if (selectionRect) form.append('selection_rect', JSON.stringify(selectionRect));
-  form.append('keep_points', JSON.stringify(keepPoints));
-  form.append('remove_points', JSON.stringify(removePoints));
-  form.append('refine_radius', refineSizeInput.value);
 }
 
 function buildConversionForm(includeOutputName = false) {
@@ -118,7 +108,10 @@ function buildConversionForm(includeOutputName = false) {
   form.append('colors', colorsInput.value);
   form.append('resample', resampleInput.value);
   form.append('alpha_threshold', '8');
-  appendIsolationData(form);
+  form.append('isolation_mode', isolationModeInput.value);
+  if (isolatedSubjectBlob) {
+    form.append('isolated_image', isolatedSubjectBlob, 'isolated-subject.png');
+  }
   if (includeOutputName) form.append('output_name', outputName.value);
   return form;
 }
@@ -128,6 +121,19 @@ function buildSourcePreviewForm() {
   form.append('image', selectedFile);
   form.append('alpha_threshold', '8');
   form.append('isolation_mode', isolationModeInput.value);
+  return form;
+}
+
+function buildIsolationForm() {
+  const form = new FormData();
+  form.append('image', selectedFile);
+  form.append('isolation_mode', isolationModeInput.value);
+  if (isolationModeInput.value === 'smart_click' && selectionPoint) {
+    form.append('selection_point', JSON.stringify(selectionPoint));
+  }
+  if (isolationModeInput.value === 'smart_lasso' && lassoPoints.length >= 3) {
+    form.append('lasso_points', JSON.stringify(lassoPoints));
+  }
   return form;
 }
 
@@ -154,7 +160,6 @@ function applyCanvasGeometry() {
   const index = zoomSteps.indexOf(previewZoom);
   zoomOutButton.disabled = !selectedFile || index <= 0;
   zoomInButton.disabled = !selectedFile || index < 0 || index >= zoomSteps.length - 1;
-
   requestAnimationFrame(drawSelectionOverlay);
 }
 
@@ -218,7 +223,7 @@ function enablePanning(frame) {
 
   frame.addEventListener('pointerdown', event => {
     if (!frame.classList.contains('has-image') || event.button !== 0) return;
-    if (frame === sourceFrame && objectIsolationEnabled() && selectionTool !== 'pan') return;
+    if (frame === sourceFrame && smartIsolationEnabled() && selectionTool !== 'pan') return;
 
     isPanning = true;
     startX = event.clientX;
@@ -292,15 +297,6 @@ function overlayPointToNormalized(event) {
   ];
 }
 
-function normalizedRectToCanvas(rect, geometry) {
-  return {
-    x: geometry.x + rect[0] * geometry.width,
-    y: geometry.y + rect[1] * geometry.height,
-    width: rect[2] * geometry.width,
-    height: rect[3] * geometry.height,
-  };
-}
-
 function normalizedPointToCanvas(point, geometry) {
   return {
     x: geometry.x + point[0] * geometry.width,
@@ -328,86 +324,48 @@ function drawSelectionOverlay() {
   context.setTransform(dpr, 0, 0, dpr, 0, 0);
   context.clearRect(0, 0, bounds.width, bounds.height);
 
-  if (!objectIsolationEnabled() || !selectedFile) return;
+  if (!smartIsolationEnabled() || !selectedFile) return;
   const geometry = sourceImageGeometry();
   if (!geometry) return;
 
-  const rect = pendingRect || selectionRect;
-  if (rect) {
-    const displayRect = normalizedRectToCanvas(rect, geometry);
-
-    context.save();
-    context.fillStyle = 'rgba(0, 0, 0, 0.18)';
-    context.beginPath();
-    context.rect(geometry.x, geometry.y, geometry.width, geometry.height);
-    context.rect(displayRect.x, displayRect.y, displayRect.width, displayRect.height);
-    context.fill('evenodd');
-    context.restore();
-
+  if (selectionPoint) {
+    const point = normalizedPointToCanvas(selectionPoint, geometry);
     context.save();
     context.strokeStyle = cssVariable('--selection', '#0071e3');
+    context.fillStyle = 'rgba(0, 113, 227, 0.14)';
     context.lineWidth = 2;
-    context.setLineDash([7, 5]);
-    context.strokeRect(displayRect.x, displayRect.y, displayRect.width, displayRect.height);
+    context.beginPath();
+    context.arc(point.x, point.y, 9, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
+    context.beginPath();
+    context.moveTo(point.x - 13, point.y);
+    context.lineTo(point.x + 13, point.y);
+    context.moveTo(point.x, point.y - 13);
+    context.lineTo(point.x, point.y + 13);
+    context.stroke();
     context.restore();
   }
 
-  const markerRadius = Math.max(3, Number(refineSizeInput.value) * Math.min(geometry.width, geometry.height));
-
-  const drawMarks = (points, variable, fallback, label) => {
+  if (lassoPoints.length > 0) {
     context.save();
-    context.fillStyle = cssVariable(variable, fallback);
-    context.strokeStyle = 'rgba(255,255,255,.9)';
-    context.lineWidth = 1.5;
-    context.font = '600 10px -apple-system, BlinkMacSystemFont, sans-serif';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-
-    for (const point of points) {
-      const displayPoint = normalizedPointToCanvas(point, geometry);
-      context.beginPath();
-      context.arc(displayPoint.x, displayPoint.y, markerRadius, 0, Math.PI * 2);
+    context.strokeStyle = cssVariable('--selection', '#0071e3');
+    context.fillStyle = 'rgba(0, 113, 227, 0.10)';
+    context.lineWidth = 2;
+    context.setLineDash(drawingLasso ? [] : [7, 5]);
+    context.beginPath();
+    lassoPoints.forEach((point, index) => {
+      const display = normalizedPointToCanvas(point, geometry);
+      if (index === 0) context.moveTo(display.x, display.y);
+      else context.lineTo(display.x, display.y);
+    });
+    if (!drawingLasso && lassoPoints.length >= 3) {
+      context.closePath();
       context.fill();
-      context.stroke();
-      context.fillStyle = '#fff';
-      context.fillText(label, displayPoint.x, displayPoint.y + .5);
-      context.fillStyle = cssVariable(variable, fallback);
     }
+    context.stroke();
     context.restore();
-  };
-
-  drawMarks(keepPoints, '--keep', '#1f8f4d', '+');
-  drawMarks(removePoints, '--remove', '#d23b32', '-');
-}
-
-function pointInsideSelection(point) {
-  if (!selectionRect) return false;
-  return (
-    point[0] >= selectionRect[0] &&
-    point[1] >= selectionRect[1] &&
-    point[0] <= selectionRect[0] + selectionRect[2] &&
-    point[1] <= selectionRect[1] + selectionRect[3]
-  );
-}
-
-function normalizedRectFromPoints(first, second) {
-  const left = Math.min(first[0], second[0]);
-  const top = Math.min(first[1], second[1]);
-  const right = Math.max(first[0], second[0]);
-  const bottom = Math.max(first[1], second[1]);
-  return [left, top, right - left, bottom - top];
-}
-
-function refreshSelectionSummary() {
-  if (!selectionRect) {
-    selectionSummary.textContent = 'No object box drawn yet.';
-    return;
   }
-
-  const refinements = keepPoints.length + removePoints.length;
-  selectionSummary.textContent = refinements
-    ? `Object box ready. ${keepPoints.length} Keep and ${removePoints.length} Remove mark${refinements === 1 ? '' : 's'}.`
-    : 'Object box ready. Add Keep or Remove marks only if the preview needs refinement.';
 }
 
 function setSelectionTool(tool) {
@@ -416,36 +374,46 @@ function setSelectionTool(tool) {
     button.classList.toggle('active', button.dataset.tool === tool);
   });
 
-  selectionOverlay.classList.remove('interactive', 'tool-box', 'tool-keep', 'tool-remove');
-  if (objectIsolationEnabled() && tool !== 'pan') {
+  selectionOverlay.classList.remove('interactive', 'tool-click', 'tool-lasso');
+  if (smartIsolationEnabled() && tool !== 'pan') {
     selectionOverlay.classList.add('interactive', `tool-${tool}`);
   }
 }
 
-function clearSelection() {
-  selectionRect = null;
-  keepPoints = [];
-  removePoints = [];
-  boxStart = null;
-  pendingRect = null;
-  setSelectionTool('box');
-  refreshSelectionSummary();
+function clearSubjectSelection({ keepTool = false } = {}) {
+  isolationRequestId += 1;
+  isolatedSubjectBlob = null;
+  selectionPoint = null;
+  lassoPoints = [];
+  drawingLasso = false;
+  if (!keepTool) {
+    setSelectionTool(isolationModeInput.value === 'smart_lasso' ? 'lasso' : 'click');
+  }
+  selectionSummary.textContent = 'No subject selected yet.';
+  outputFrame.classList.remove('has-image');
+  if (smartIsolationEnabled() && selectedFile) {
+    setPreviewState(
+      isolationModeInput.value === 'smart_lasso'
+        ? 'Draw a loose loop around the subject in the Source Image.'
+        : 'Click the subject you want to isolate in the Source Image.'
+    );
+  }
   drawSelectionOverlay();
   updateConvertState();
-
-  if (objectIsolationEnabled()) {
-    outputFrame.classList.remove('has-image');
-    setPreviewState('Draw a box around the object in the Source Image.');
-  }
+  refreshSuggestedName();
 }
 
-function scheduleOutputPreview(delay = 300) {
+function scheduleOutputPreview(delay = 250) {
   if (!selectedFile) return;
   window.clearTimeout(previewTimer);
 
-  if (objectIsolationEnabled() && !selectionRect) {
+  if (smartIsolationEnabled() && !isolatedSubjectBlob) {
     outputFrame.classList.remove('has-image');
-    setPreviewState('Draw a box around the object in the Source Image.');
+    setPreviewState(
+      isolationModeInput.value === 'smart_lasso'
+        ? 'Draw a loose loop around the subject in the Source Image.'
+        : 'Click the subject you want to isolate in the Source Image.'
+    );
     updateConvertState();
     return;
   }
@@ -453,99 +421,141 @@ function scheduleOutputPreview(delay = 300) {
   previewTimer = window.setTimeout(renderOutputPreview, delay);
 }
 
-function selectionChanged() {
-  refreshSelectionSummary();
-  drawSelectionOverlay();
+async function isolateCurrentSelection() {
+  if (!selectedFile || !smartIsolationEnabled()) return;
+  if (isolationModeInput.value === 'smart_click' && !selectionPoint) return;
+  if (isolationModeInput.value === 'smart_lasso' && lassoPoints.length < 3) return;
+
+  const requestId = ++isolationRequestId;
+  isolatedSubjectBlob = null;
+  outputFrame.classList.remove('has-image');
   updateConvertState();
-  refreshSuggestedName();
-  scheduleOutputPreview(120);
+  selectionSummary.textContent = 'Apple Vision is identifying the subject...';
+  setPreviewState('Identifying and lifting the selected subject...');
+
+  try {
+    const response = await fetch('/api/isolate', {
+      method: 'POST',
+      body: buildIsolationForm(),
+    });
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type') || '';
+      const data = contentType.includes('application/json') ? await response.json() : {};
+      throw new Error(data.error || 'The selected subject could not be isolated.');
+    }
+
+    const blob = await response.blob();
+    if (requestId !== isolationRequestId) return;
+
+    isolatedSubjectBlob = blob;
+    selectionSummary.textContent = 'Subject isolated. Click or lasso again to choose a different subject.';
+    setSelectionTool('pan');
+    drawSelectionOverlay();
+    updateConvertState();
+    setStatus(hasOutputFolder ? 'Ready to convert.' : 'Choose an output folder.');
+    await renderOutputPreview();
+  } catch (error) {
+    if (requestId !== isolationRequestId) return;
+    isolatedSubjectBlob = null;
+    selectionSummary.textContent = 'No subject selected. Try again.';
+    setPreviewState(error.message, 'error');
+    setStatus('Subject selection needs another try.', 'error');
+    updateConvertState();
+  }
 }
 
 selectionOverlay.addEventListener('pointerdown', event => {
-  if (!objectIsolationEnabled() || selectionTool === 'pan' || event.button !== 0) return;
-
+  if (!smartIsolationEnabled() || selectionTool === 'pan' || event.button !== 0) return;
   const point = overlayPointToNormalized(event);
   if (!point) return;
 
-  if (selectionTool === 'box') {
-    boxStart = point;
-    pendingRect = [point[0], point[1], 0, 0];
-    selectionOverlay.setPointerCapture(event.pointerId);
+  if (selectionTool === 'click') {
+    isolationModeInput.value = 'smart_click';
+    selectionPoint = point;
+    lassoPoints = [];
+    isolatedSubjectBlob = null;
     drawSelectionOverlay();
+    refreshSuggestedName();
+    isolateCurrentSelection();
     event.preventDefault();
     return;
   }
 
-  if (!selectionRect) {
-    setPreviewState('Draw a box around the object before adding refinement marks.', 'error');
-    return;
+  if (selectionTool === 'lasso') {
+    isolationModeInput.value = 'smart_lasso';
+    selectionPoint = null;
+    isolatedSubjectBlob = null;
+    lassoPoints = [point];
+    drawingLasso = true;
+    selectionOverlay.setPointerCapture(event.pointerId);
+    selectionSummary.textContent = 'Drawing Smart Lasso...';
+    drawSelectionOverlay();
+    event.preventDefault();
   }
-  if (!pointInsideSelection(point)) {
-    setPreviewState('Keep and Remove marks must be inside the object box.', 'error');
-    return;
-  }
-
-  if (selectionTool === 'keep') {
-    keepPoints.push(point);
-  } else if (selectionTool === 'remove') {
-    removePoints.push(point);
-  }
-  selectionChanged();
-  event.preventDefault();
 });
 
 selectionOverlay.addEventListener('pointermove', event => {
-  if (!boxStart || selectionTool !== 'box') return;
+  if (!drawingLasso || selectionTool !== 'lasso') return;
   const point = overlayPointToNormalized(event);
   if (!point) return;
-  pendingRect = normalizedRectFromPoints(boxStart, point);
-  drawSelectionOverlay();
+
+  const previous = lassoPoints[lassoPoints.length - 1];
+  const distance = Math.hypot(point[0] - previous[0], point[1] - previous[1]);
+  if (distance >= 0.004 && lassoPoints.length < 800) {
+    lassoPoints.push(point);
+    drawSelectionOverlay();
+  }
   event.preventDefault();
 });
 
-function finishBox(event) {
-  if (!boxStart || selectionTool !== 'box') return;
-
-  const point = overlayPointToNormalized(event);
-  const rect = point ? normalizedRectFromPoints(boxStart, point) : pendingRect;
-  boxStart = null;
-  pendingRect = null;
-
+function finishLasso(event) {
+  if (!drawingLasso || selectionTool !== 'lasso') return;
+  drawingLasso = false;
   if (selectionOverlay.hasPointerCapture(event.pointerId)) {
     selectionOverlay.releasePointerCapture(event.pointerId);
   }
 
-  if (!rect || rect[2] < 0.01 || rect[3] < 0.01) {
+  if (lassoPoints.length < 3) {
+    lassoPoints = [];
+    selectionSummary.textContent = 'No subject selected yet.';
+    setPreviewState('Draw a larger loop around the subject.', 'error');
     drawSelectionOverlay();
-    setPreviewState('Draw a larger box around the object.', 'error');
     return;
   }
 
-  selectionRect = rect;
-  keepPoints = [];
-  removePoints = [];
-  setSelectionTool('pan');
-  selectionChanged();
+  drawSelectionOverlay();
+  refreshSuggestedName();
+  isolateCurrentSelection();
 }
 
-selectionOverlay.addEventListener('pointerup', finishBox);
+selectionOverlay.addEventListener('pointerup', finishLasso);
 selectionOverlay.addEventListener('pointercancel', event => {
-  boxStart = null;
-  pendingRect = null;
+  drawingLasso = false;
+  lassoPoints = [];
   if (selectionOverlay.hasPointerCapture(event.pointerId)) {
     selectionOverlay.releasePointerCapture(event.pointerId);
   }
+  selectionSummary.textContent = 'No subject selected yet.';
   drawSelectionOverlay();
 });
 
 document.querySelectorAll('[data-tool]').forEach(button => {
-  button.addEventListener('click', () => setSelectionTool(button.dataset.tool));
+  button.addEventListener('click', () => {
+    const tool = button.dataset.tool;
+    if (tool === 'click' && isolationModeInput.value !== 'smart_click') {
+      isolationModeInput.value = 'smart_click';
+      clearSubjectSelection({ keepTool: true });
+      refreshIsolationUI({ rerenderSource: false });
+    } else if (tool === 'lasso' && isolationModeInput.value !== 'smart_lasso') {
+      isolationModeInput.value = 'smart_lasso';
+      clearSubjectSelection({ keepTool: true });
+      refreshIsolationUI({ rerenderSource: false });
+    }
+    setSelectionTool(tool);
+    drawSelectionOverlay();
+  });
 });
-clearSelectionButton.addEventListener('click', clearSelection);
-refineSizeInput.addEventListener('change', () => {
-  drawSelectionOverlay();
-  if (selectionRect && (keepPoints.length || removePoints.length)) scheduleOutputPreview(120);
-});
+clearSelectionButton.addEventListener('click', () => clearSubjectSelection());
 
 async function renderSourceComparison() {
   if (!selectedFile) return;
@@ -577,13 +587,13 @@ async function renderSourceComparison() {
 
 async function renderOutputPreview() {
   if (!selectedFile) return;
-  if (objectIsolationEnabled() && !selectionRect) {
-    setPreviewState('Draw a box around the object in the Source Image.');
+  if (smartIsolationEnabled() && !isolatedSubjectBlob) {
+    scheduleOutputPreview();
     return;
   }
 
   const requestId = ++previewRequestId;
-  setPreviewState(objectIsolationEnabled() ? 'Isolating object and updating preview...' : 'Updating preview...');
+  setPreviewState(smartIsolationEnabled() ? 'Pixelating isolated subject...' : 'Updating preview...');
 
   try {
     const response = await fetch('/api/preview', {
@@ -605,7 +615,7 @@ async function renderOutputPreview() {
     outputFrame.classList.add('has-image');
 
     const colorText = paletteIsLimited() ? `up to ${colorsInput.value} colors` : 'resized colors preserved';
-    const isolationText = objectIsolationEnabled() ? 'selected object only' : 'automatic outer background';
+    const isolationText = smartIsolationEnabled() ? 'Apple Vision subject only' : 'automatic outer background';
     setPreviewState(`${widthInput.value} x ${heightInput.value} · ${colorText} · ${isolationText}`);
   } catch (error) {
     if (requestId !== previewRequestId) return;
@@ -621,11 +631,11 @@ async function chooseFile(file) {
   }
 
   selectedFile = file;
-  selectionRect = null;
-  keepPoints = [];
-  removePoints = [];
-  boxStart = null;
-  pendingRect = null;
+  isolatedSubjectBlob = null;
+  selectionPoint = null;
+  lassoPoints = [];
+  drawingLasso = false;
+  isolationRequestId += 1;
 
   fileMeta.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
   changeImageButton.hidden = false;
@@ -638,10 +648,12 @@ async function chooseFile(file) {
   outputFrame.scrollTop = 0;
   outputFrame.scrollLeft = 0;
 
-  if (objectIsolationEnabled()) setSelectionTool('box');
-  refreshSelectionSummary();
+  if (smartIsolationEnabled()) {
+    setSelectionTool(isolationModeInput.value === 'smart_lasso' ? 'lasso' : 'click');
+    selectionSummary.textContent = 'No subject selected yet.';
+  }
   updateConvertState();
-  setStatus(hasOutputFolder ? (selectionReady() ? 'Ready to convert.' : 'Select the object to convert.') : 'Choose an output folder.');
+  setStatus(hasOutputFolder ? (selectionReady() ? 'Ready to convert.' : 'Select a subject to convert.') : 'Choose an output folder.');
 
   await renderSourceComparison();
   drawSelectionOverlay();
@@ -649,22 +661,25 @@ async function chooseFile(file) {
 }
 
 function refreshIsolationUI({ rerenderSource = true } = {}) {
-  const enabled = objectIsolationEnabled();
+  const enabled = smartIsolationEnabled();
   objectSettings.hidden = !enabled;
   objectToolbar.hidden = !enabled;
-  isolationNote.textContent = enabled
-    ? 'Only the object inside your interactive selection will be kept. The rest becomes transparent before pixel conversion.'
-    : 'The current automatic background behavior stays enabled.';
 
-  if (enabled) {
-    setSelectionTool(selectionRect ? 'pan' : 'box');
+  if (!enabled) {
+    isolationNote.textContent = 'The current automatic background behavior stays enabled.';
+    selectionOverlay.classList.remove('interactive', 'tool-click', 'tool-lasso');
+  } else if (isolationModeInput.value === 'smart_lasso') {
+    isolationNote.textContent = 'Draw a loose loop around the object. Apple Vision chooses the detected foreground subject that best matches the lasso.';
+    objectInstructions.textContent = 'Draw around the object loosely. You do not need to trace its exact edge. Apple Vision detects foreground subjects and keeps the subject occupying the lasso.';
+    setSelectionTool('lasso');
   } else {
-    selectionOverlay.classList.remove('interactive', 'tool-box', 'tool-keep', 'tool-remove');
+    isolationNote.textContent = 'Click directly on the object. Apple Vision detects and lifts the complete foreground subject with the background removed.';
+    objectInstructions.textContent = 'Click directly on the object you want. Apple Vision detects the complete foreground subject and removes everything else.';
+    setSelectionTool('click');
   }
 
   refreshSuggestedName();
   updateConvertState();
-  refreshSelectionSummary();
   drawSelectionOverlay();
 
   if (selectedFile && rerenderSource) renderSourceComparison();
@@ -711,7 +726,10 @@ document.querySelectorAll('.preset').forEach(button => button.addEventListener('
   scheduleOutputPreview();
 }));
 
-isolationModeInput.addEventListener('change', () => refreshIsolationUI());
+isolationModeInput.addEventListener('change', () => {
+  clearSubjectSelection({ keepTool: true });
+  refreshIsolationUI();
+});
 colorModeInput.addEventListener('change', () => {
   refreshColorControls();
   refreshSuggestedName();
@@ -738,7 +756,7 @@ folderButton.addEventListener('click', async () => {
     if (!response.ok) throw new Error(data.error || 'Could not choose a folder.');
 
     if (data.cancelled) {
-      setStatus(selectedFile ? (selectionReady() ? 'Choose an output folder.' : 'Select the object to convert.') : 'Choose an image and output folder to begin.');
+      setStatus(selectedFile ? (selectionReady() ? 'Choose an output folder.' : 'Select a subject to convert.') : 'Choose an image and output folder to begin.');
       return;
     }
 
@@ -749,7 +767,7 @@ folderButton.addEventListener('click', async () => {
     if (!selectedFile) {
       setStatus('Choose an image.');
     } else if (!selectionReady()) {
-      setStatus('Draw a box around the object.');
+      setStatus('Select a subject in the Source Image.');
     } else {
       setStatus('Ready to convert.');
     }
@@ -764,7 +782,7 @@ convertButton.addEventListener('click', async () => {
   if (!selectedFile || !hasOutputFolder || !selectionReady()) return;
 
   convertButton.disabled = true;
-  setStatus(objectIsolationEnabled() ? 'Isolating object and converting...' : 'Converting...');
+  setStatus(smartIsolationEnabled() ? 'Converting isolated subject...' : 'Converting...');
 
   try {
     const response = await fetch('/api/convert', {

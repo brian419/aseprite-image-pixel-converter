@@ -10,11 +10,11 @@ import webbrowser
 from pathlib import Path
 
 from flask import Flask, jsonify, request, send_file
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from waitress import serve
 
+from apple_subject_lift import SubjectIsolationError, lift_subject
 from aseprite_image_pixel_converter import auto_remove_background, convert_pil_image
-from object_isolation import isolate_object
 
 APP_HOST = "127.0.0.1"
 APP_PORT = 8765
@@ -38,17 +38,6 @@ def _int_form(name: str, default: int, minimum: int, maximum: int) -> int:
     return value
 
 
-def _float_form(name: str, default: float, minimum: float, maximum: float) -> float:
-    raw = request.form.get(name, str(default))
-    try:
-        value = float(raw)
-    except ValueError as exc:
-        raise ValueError(f"{name} must be a number.") from exc
-    if not minimum <= value <= maximum:
-        raise ValueError(f"{name} must be between {minimum} and {maximum}.")
-    return value
-
-
 def _json_form(name: str, default):
     raw = request.form.get(name)
     if raw is None or raw == "":
@@ -61,8 +50,8 @@ def _json_form(name: str, default):
 
 def _isolation_mode() -> str:
     mode = request.form.get("isolation_mode", "auto")
-    if mode not in {"auto", "object"}:
-        raise ValueError("Unknown object isolation mode.")
+    if mode not in {"auto", "smart_click", "smart_lasso"}:
+        raise ValueError("Unknown smart subject isolation mode.")
     return mode
 
 
@@ -121,43 +110,38 @@ def _choose_output_folder() -> Path | None:
     raise RuntimeError(error_text or "Could not open the folder chooser.")
 
 
-def _read_uploaded_rgba() -> tuple[Image.Image, str]:
-    upload = request.files.get("image")
+def _read_uploaded_rgba(field_name: str = "image") -> tuple[Image.Image, str]:
+    upload = request.files.get(field_name)
     if upload is None or not upload.filename:
-        raise ValueError("Choose an image first.")
+        if field_name == "image":
+            raise ValueError("Choose an image first.")
+        raise ValueError(f"Missing uploaded {field_name} image.")
 
     with Image.open(upload.stream) as opened:
-        source = opened.convert("RGBA")
+        source = ImageOps.exif_transpose(opened).convert("RGBA")
 
     return source, upload.filename
 
 
-def _isolate_if_requested(source: Image.Image) -> tuple[Image.Image, bool]:
+def _read_conversion_source() -> tuple[Image.Image, str, bool]:
+    source, source_name = _read_uploaded_rgba("image")
     mode = _isolation_mode()
-    if mode == "auto":
-        return source, False
 
-    selection_rect = _json_form("selection_rect", None)
-    if selection_rect is None:
-        raise ValueError("Draw a selection box around the object first.")
+    isolated_upload = request.files.get("isolated_image")
+    if isolated_upload is not None and isolated_upload.filename:
+        with Image.open(isolated_upload.stream) as opened:
+            isolated = ImageOps.exif_transpose(opened).convert("RGBA")
+        if isolated.getchannel("A").getbbox() is None:
+            raise ValueError("The isolated subject image contains no visible pixels.")
+        return isolated, source_name, True
 
-    keep_points = _json_form("keep_points", [])
-    remove_points = _json_form("remove_points", [])
-    refine_radius = _float_form("refine_radius", 0.018, 0.002, 0.08)
-
-    isolated = isolate_object(
-        source,
-        selection_rect=selection_rect,
-        keep_points=keep_points,
-        remove_points=remove_points,
-        refine_radius=refine_radius,
-    )
-    return isolated, True
+    if mode != "auto":
+        raise ValueError("Select a subject in the Source Image before previewing or converting.")
+    return source, source_name, False
 
 
 def _convert_request_image() -> tuple[Image.Image, str, int, int, int | None, bool]:
-    source, source_name = _read_uploaded_rgba()
-    source, isolated = _isolate_if_requested(source)
+    source, source_name, isolated = _read_conversion_source()
 
     width = _int_form("width", 128, 8, 1024)
     height = _int_form("height", 128, 8, 1024)
@@ -191,6 +175,15 @@ def _convert_request_image() -> tuple[Image.Image, str, int, int, int | None, bo
     return result, source_name, width, height, colors, isolated
 
 
+def _png_response(image: Image.Image):
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", optimize=False)
+    buffer.seek(0)
+    response = send_file(buffer, mimetype="image/png", as_attachment=False)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.get("/")
 def index():
     return app.send_static_file("index.html")
@@ -218,18 +211,28 @@ def choose_folder():
 def source_preview():
     try:
         source, _source_name = _read_uploaded_rgba()
-        # In object-selection mode the unmodified source stays visible so the user
-        # can draw and refine the selection against the full image.
         if _isolation_mode() == "auto":
             source = auto_remove_background(source)
-
-        buffer = io.BytesIO()
-        source.save(buffer, format="PNG", optimize=False)
-        buffer.seek(0)
-        response = send_file(buffer, mimetype="image/png", as_attachment=False)
-        response.headers["Cache-Control"] = "no-store"
-        return response
+        return _png_response(source)
     except (ValueError, UnidentifiedImageError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.post("/api/isolate")
+def isolate():
+    try:
+        source, _source_name = _read_uploaded_rgba()
+        mode = _isolation_mode()
+        if mode == "smart_click":
+            selection_point = _json_form("selection_point", None)
+            result = lift_subject(source, mode="click", point=selection_point)
+        elif mode == "smart_lasso":
+            lasso_points = _json_form("lasso_points", None)
+            result = lift_subject(source, mode="lasso", lasso=lasso_points)
+        else:
+            raise ValueError("Choose Smart Click or Smart Lasso before selecting a subject.")
+        return _png_response(result)
+    except (ValueError, SubjectIsolationError, UnidentifiedImageError) as exc:
         return jsonify({"error": str(exc)}), 400
 
 
@@ -237,12 +240,7 @@ def source_preview():
 def preview():
     try:
         result, _source_name, _width, _height, _colors, _isolated = _convert_request_image()
-        buffer = io.BytesIO()
-        result.save(buffer, format="PNG", optimize=False)
-        buffer.seek(0)
-        response = send_file(buffer, mimetype="image/png", as_attachment=False)
-        response.headers["Cache-Control"] = "no-store"
-        return response
+        return _png_response(result)
     except (ValueError, UnidentifiedImageError) as exc:
         return jsonify({"error": str(exc)}), 400
 

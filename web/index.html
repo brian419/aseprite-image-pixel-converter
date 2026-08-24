@@ -23,11 +23,10 @@
             </div>
           </div>
 
-          <div id="objectToolbar" class="object-toolbar" hidden aria-label="Object selection tools">
-            <div class="tool-group" role="group" aria-label="Selection tool">
-              <button class="tool-button active" type="button" data-tool="box">Box</button>
-              <button class="tool-button" type="button" data-tool="keep">Keep</button>
-              <button class="tool-button" type="button" data-tool="remove">Remove</button>
+          <div id="objectToolbar" class="object-toolbar" hidden aria-label="Smart subject selection tools">
+            <div class="tool-group" role="group" aria-label="Subject selection tool">
+              <button class="tool-button active" type="button" data-tool="click">Smart Click</button>
+              <button class="tool-button" type="button" data-tool="lasso">Smart Lasso</button>
               <button class="tool-button" type="button" data-tool="pan">Pan</button>
             </div>
             <button id="clearSelectionButton" class="secondary-button compact-button" type="button">Clear</button>
@@ -79,7 +78,8 @@
             </div>
             <select id="isolationMode">
               <option value="auto" selected>Whole image / automatic outer background removal</option>
-              <option value="object">Only one selected object</option>
+              <option value="smart_click">One subject - Smart Click</option>
+              <option value="smart_lasso">One subject - Smart Lasso</option>
             </select>
             <p id="isolationNote" class="field-note">The current automatic background behavior stays enabled.</p>
           </div>
@@ -88,23 +88,16 @@
             <div class="object-settings-grid">
               <div>
                 <div class="label-row">
-                  <label for="refineSize">Object selection</label>
-                  <span class="hint">local GrabCut segmentation</span>
+                  <label>Smart subject isolation</label>
+                  <span class="hint">Apple Vision · local on this Mac</span>
                 </div>
-                <p class="field-note object-instructions">
-                  Choose <strong>Box</strong>, then drag a rectangle around the object in the Source Image.
-                  If the result misses part of the object, choose <strong>Keep</strong> and click that area.
-                  Choose <strong>Remove</strong> and click unwanted background. Use <strong>Pan</strong> when zoomed in.
+                <p id="objectInstructions" class="field-note object-instructions">
+                  Click directly on the object you want. Apple Vision detects the complete foreground subject and removes everything else.
                 </p>
               </div>
               <div>
-                <div class="label-row"><label for="refineSize">Keep / Remove mark size</label></div>
-                <select id="refineSize">
-                  <option value="0.010">Small</option>
-                  <option value="0.018" selected>Medium</option>
-                  <option value="0.030">Large</option>
-                </select>
-                <p id="selectionSummary" class="field-note">No object box drawn yet.</p>
+                <div class="label-row"><label>Selection status</label></div>
+                <p id="selectionSummary" class="field-note selection-summary">No subject selected yet.</p>
               </div>
             </div>
           </div>
@@ -172,7 +165,7 @@
         </div>
       </div>
     </section>
-    <p class="privacy">The interface is served from localhost. Images and object-selection processing stay on this computer and are not sent to an external service.</p>
+    <p class="privacy">The interface is served from localhost. Smart subject detection uses Apple's Vision framework locally on this Mac. Images are not sent to an external service.</p>
   </main>
 
   <script src="/app.js"></script>
