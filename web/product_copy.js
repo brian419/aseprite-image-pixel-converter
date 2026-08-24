@@ -27,7 +27,10 @@
   const isolationModeInput = document.getElementById('isolationMode');
   const selectionSummary = document.getElementById('selectionSummary');
   const selectionStatusCopy = selectionSummary?.closest('.selection-status-copy');
+  const fileMeta = document.getElementById('fileMeta');
+  const previewState = document.getElementById('previewState');
   let smartLassoFallback = null;
+  let automaticResultFallback = null;
 
   if (selectionStatusCopy) {
     smartLassoFallback = document.createElement('p');
@@ -38,18 +41,38 @@
     selectionStatusCopy.appendChild(smartLassoFallback);
   }
 
-  function syncSmartLassoFallback() {
-    if (!smartLassoFallback || !selectionSummary || !isolationModeInput) return;
-    const subjectIsolated = selectionSummary.textContent.trim().startsWith('Subject isolated.');
-    smartLassoFallback.hidden = !(isolationModeInput.value === 'smart_click' && subjectIsolated);
+  if (previewState) {
+    automaticResultFallback = document.createElement('p');
+    automaticResultFallback.className = 'preview-state';
+    automaticResultFallback.textContent = 'Not quite right? Try Smart Lasso for a more guided selection.';
+    automaticResultFallback.hidden = true;
+    automaticResultFallback.style.marginTop = '6px';
+    previewState.insertAdjacentElement('afterend', automaticResultFallback);
+  }
+
+  function imageIsLoaded() {
+    return Boolean(fileMeta && fileMeta.textContent.trim() && fileMeta.textContent.trim() !== 'No image selected');
+  }
+
+  function syncFallbackGuidance() {
+    if (!isolationModeInput) return;
+
+    if (smartLassoFallback && selectionSummary) {
+      const subjectIsolated = selectionSummary.textContent.trim().startsWith('Subject isolated.');
+      smartLassoFallback.hidden = !(isolationModeInput.value === 'smart_click' && subjectIsolated);
+    }
+
+    if (automaticResultFallback) {
+      automaticResultFallback.hidden = !(isolationModeInput.value === 'auto' && imageIsLoaded());
+    }
   }
 
   cleanNode(document.body);
-  syncSmartLassoFallback();
+  syncFallbackGuidance();
 
-  isolationModeInput?.addEventListener('change', syncSmartLassoFallback);
+  isolationModeInput?.addEventListener('change', syncFallbackGuidance);
   document.querySelectorAll('[data-tool]').forEach(button => {
-    button.addEventListener('click', () => window.setTimeout(syncSmartLassoFallback, 0));
+    button.addEventListener('click', () => window.setTimeout(syncFallbackGuidance, 0));
   });
 
   const observer = new MutationObserver(mutations => {
@@ -60,7 +83,7 @@
       }
       for (const node of mutation.addedNodes) cleanNode(node);
     }
-    syncSmartLassoFallback();
+    syncFallbackGuidance();
   });
 
   observer.observe(document.body, {
