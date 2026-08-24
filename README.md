@@ -45,6 +45,8 @@ optionally add Keep / Remove refinement marks
     ↓
 the rest of the image becomes transparent
     ↓
+the isolated object is trimmed and fitted to the target canvas
+    ↓
 pixel conversion uses only the isolated object
     ↓
 save the PNG and refine in Aseprite
@@ -160,6 +162,8 @@ The selection rectangle should contain the full object while excluding as much u
 Object isolation is deliberately interactive rather than text-prompt based. This keeps the tool small, private, and practical on modest CPU-only hardware. It does not need PyTorch, a large segmentation checkpoint, or an internet API.
 
 For very large images, the segmentation working copy is capped at 1200 pixels on its longest side. The resulting mask is then mapped back to the original image before the normal pixel conversion. This prevents huge photographs from making the local segmentation unnecessarily expensive.
+
+After segmentation, transparent space outside the selected object is trimmed before the object is fitted and centered on the requested output canvas. This makes the selected object use the available pixel resolution instead of keeping the original photograph's empty composition around it.
 
 ## Automatic Background Transparency
 
