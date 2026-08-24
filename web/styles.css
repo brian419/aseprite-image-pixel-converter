@@ -215,6 +215,10 @@ h1 { margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -.03em; }
 .meta { margin: 0; }
 .preview-state { margin-top: 9px; }
 .preview-state.error { color: var(--error); }
+.help-tip {
+  color: var(--blue);
+  font-weight: 600;
+}
 .settings-pane {
   padding: 28px;
   border-top: 1px solid var(--border);
