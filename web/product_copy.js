@@ -34,7 +34,7 @@
 
   if (selectionStatusCopy) {
     smartLassoFallback = document.createElement('p');
-    smartLassoFallback.className = 'field-note selection-summary';
+    smartLassoFallback.className = 'field-note selection-summary help-tip';
     smartLassoFallback.textContent = 'Not quite right? Try Smart Lasso for a more guided selection.';
     smartLassoFallback.hidden = true;
     smartLassoFallback.style.marginTop = '6px';
@@ -43,7 +43,7 @@
 
   if (previewState) {
     automaticResultFallback = document.createElement('p');
-    automaticResultFallback.className = 'preview-state';
+    automaticResultFallback.className = 'preview-state help-tip';
     automaticResultFallback.textContent = 'Not quite right? Try Smart Lasso for a more guided selection.';
     automaticResultFallback.hidden = true;
     automaticResultFallback.style.marginTop = '6px';
